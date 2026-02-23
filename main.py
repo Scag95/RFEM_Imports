@@ -307,6 +307,8 @@ class MainWindow(QMainWindow):
         self.info_label.setStyleSheet("font-size: 11px;")
         self.info_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.info_label.setMaximumHeight(22)
+        self.save_dxf_button = QPushButton("Guardar DXF")
+        self.save_dxf_button.clicked.connect(self.save_dxf_file)
 
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
@@ -322,6 +324,7 @@ class MainWindow(QMainWindow):
         left_layout.setSpacing(4)
         left_layout.addWidget(self.viewer)
         left_layout.addWidget(self.info_label)
+        left_layout.addWidget(self.save_dxf_button)
         left_layout.setStretch(0, 1)
         left_layout.setStretch(1, 0)
 
@@ -338,6 +341,10 @@ class MainWindow(QMainWindow):
         open_action = QAction("Cargar DXF", self)
         open_action.triggered.connect(self.load_dxf_file)
         file_menu.addAction(open_action)
+
+        save_action = QAction("Guardar DXF", self)
+        save_action.triggered.connect(self.save_dxf_file)
+        file_menu.addAction(save_action)
 
         exit_action = QAction("Salir", self)
         exit_action.triggered.connect(self.close)
@@ -1347,6 +1354,59 @@ class MainWindow(QMainWindow):
             text="\n".join(report_lines),
             parent=self,
         ).exec()
+
+    def save_dxf_file(self) -> None:
+        if not self.entity_geometries:
+            QMessageBox.information(
+                self,
+                "Guardar DXF",
+                "No hay geometria para guardar.",
+            )
+            return
+
+        default_name = "resultado_uniones.dxf"
+        if self.current_file_path.lower().endswith(".dxf"):
+            base = os.path.splitext(os.path.basename(self.current_file_path))[0]
+            default_name = f"{base}_editado.dxf"
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Guardar archivo DXF",
+            default_name,
+            "DXF Files (*.dxf);;All Files (*)",
+        )
+        if not file_path:
+            return
+
+        if not file_path.lower().endswith(".dxf"):
+            file_path = f"{file_path}.dxf"
+
+        try:
+            doc = ezdxf.new("R2010")
+            msp = doc.modelspace()
+
+            existing_layers = {layer.dxf.name for layer in doc.layers}
+            for entity in self.entity_geometries:
+                if entity.layer not in existing_layers:
+                    doc.layers.new(name=entity.layer)
+                    existing_layers.add(entity.layer)
+
+            for entity in self.entity_geometries:
+                for x1, y1, z1, x2, y2, z2 in entity.segments:
+                    msp.add_line(
+                        (float(x1), float(y1), float(z1)),
+                        (float(x2), float(y2), float(z2)),
+                        dxfattribs={"layer": entity.layer},
+                    )
+
+            doc.saveas(file_path)
+            self.statusBar().showMessage(f"DXF guardado: {file_path}")
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Guardar DXF",
+                f"No se pudo guardar el archivo DXF.\n\nDetalle: {exc}",
+            )
 
     def load_dxf_file(self) -> None:
         file_path, _ = QFileDialog.getOpenFileName(
