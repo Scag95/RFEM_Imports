@@ -5,6 +5,7 @@ import ezdxf
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QColor
 from PyQt6.QtWidgets import (
+    QDialog,
     QFileDialog,
     QHBoxLayout,
     QInputDialog,
@@ -21,8 +22,25 @@ from PyQt6.QtWidgets import (
 from src.core.dxf_utils import collect_entity_geometries, flatten_segments_for_viewer
 from src.core.geometry import EntityGeometry
 from src.domain.structural_processor import StructuralProcessor
-from src.ui.dialogs import DeleteLayerDialog, ResultTextDialog
+from src.ui.dialogs import DeleteLayerDialog, RenameLayersDialog, ResultTextDialog
 from src.ui.viewer_3d import DXFViewer3D
+
+DXF_INVALID_LAYER_CHAR_REPLACEMENTS = str.maketrans(
+    {
+        "<": "(",
+        ">": ")",
+        "/": "-",
+        "\\": "-",
+        '"': "",
+        ":": " -",
+        ";": " -",
+        "?": "",
+        "*": "x",
+        "|": "-",
+        "=": "-",
+        "'": "",
+    }
+)
 
 
 class MainWindow(QMainWindow):
@@ -92,6 +110,10 @@ class MainWindow(QMainWindow):
         remove_layer_action.triggered.connect(self.open_delete_layer_dialog)
         tools_menu.addAction(remove_layer_action)
 
+        rename_layers_action = QAction("Renombrar capas", self)
+        rename_layers_action.triggered.connect(self.open_rename_layers_dialog)
+        tools_menu.addAction(rename_layers_action)
+
         detect_connections_action = QAction("Detectar montantes-durmientes", self)
         detect_connections_action.triggered.connect(self.detect_montantes_durmientes)
         tools_menu.addAction(detect_connections_action)
@@ -114,6 +136,31 @@ class MainWindow(QMainWindow):
             hue = int((i * 137.5) % 360)
             colors[layer] = QColor.fromHsv(hue, 210, 230)
         return colors
+
+    def _sanitize_layer_name(self, layer_name: str) -> str:
+        sanitized = layer_name.translate(DXF_INVALID_LAYER_CHAR_REPLACEMENTS)
+        sanitized = " ".join(sanitized.split())
+        return sanitized or "Layer"
+
+    def _build_safe_layer_map(self, layer_names: list[str]) -> tuple[dict[str, str], list[tuple[str, str]]]:
+        used_names: set[str] = set()
+        safe_names: dict[str, str] = {}
+        adjusted_names: list[tuple[str, str]] = []
+
+        for original_name in sorted(layer_names):
+            base_name = self._sanitize_layer_name(original_name)
+            safe_name = base_name
+            suffix = 2
+            while safe_name in used_names:
+                safe_name = f"{base_name} ({suffix})"
+                suffix += 1
+
+            used_names.add(safe_name)
+            safe_names[original_name] = safe_name
+            if safe_name != original_name:
+                adjusted_names.append((original_name, safe_name))
+
+        return safe_names, adjusted_names
 
     def _refresh_from_entity_geometries(self) -> None:
         self.layer_counts = defaultdict(int)
@@ -325,6 +372,13 @@ class MainWindow(QMainWindow):
             file_path = f"{file_path}.dxf"
 
         try:
+            layer_names = sorted({entity.layer for entity in self.entity_geometries})
+            safe_layer_map, adjusted_names = self._build_safe_layer_map(layer_names)
+            if adjusted_names:
+                for entity in self.entity_geometries:
+                    entity.layer = safe_layer_map[entity.layer]
+                self._refresh_from_entity_geometries()
+
             doc = ezdxf.new("R2010")
             msp = doc.modelspace()
 
@@ -343,7 +397,12 @@ class MainWindow(QMainWindow):
                     )
 
             doc.saveas(file_path)
-            self.statusBar().showMessage(f"DXF guardado: {file_path}")
+            if adjusted_names:
+                self.statusBar().showMessage(
+                    f"DXF guardado: {file_path} | Se ajustaron nombres de capa para DXF"
+                )
+            else:
+                self.statusBar().showMessage(f"DXF guardado: {file_path}")
         except Exception as exc:
             QMessageBox.critical(
                 self,
@@ -444,6 +503,77 @@ class MainWindow(QMainWindow):
         self._remove_layer_item(layer_to_remove)
         self._update_info_after_layer_delete()
         self.statusBar().showMessage(f"Capa eliminada: {layer_to_remove}")
+
+    def open_rename_layers_dialog(self) -> None:
+        layers = sorted(self.layer_counts.keys())
+        if not layers:
+            QMessageBox.information(
+                self,
+                "Renombrar capas",
+                "No hay capas cargadas para renombrar.",
+            )
+            return
+
+        dialog = RenameLayersDialog(layers, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        renamed_layers = dialog.renamed_layers()
+        if not renamed_layers:
+            return
+
+        invalid_names = [name for name in renamed_layers.values() if not name]
+        if invalid_names:
+            QMessageBox.warning(
+                self,
+                "Renombrar capas",
+                "Todos los nombres de capa deben tener contenido.",
+            )
+            return
+
+        new_names = list(renamed_layers.values())
+        if len(new_names) != len(set(new_names)):
+            QMessageBox.warning(
+                self,
+                "Renombrar capas",
+                "No puede haber nombres de capa duplicados.",
+            )
+            return
+
+        safe_layer_map, adjusted_names = self._build_safe_layer_map(new_names)
+        safe_renamed_layers = {
+            original_name: safe_layer_map[new_name]
+            for original_name, new_name in renamed_layers.items()
+        }
+
+        safe_names = list(safe_renamed_layers.values())
+        if len(safe_names) != len(set(safe_names)):
+            QMessageBox.warning(
+                self,
+                "Renombrar capas",
+                "Los nombres de capa resultan duplicados despues de ajustarlos a un formato valido para DXF.",
+            )
+            return
+
+        changes = 0
+        for entity in self.entity_geometries:
+            updated_name = safe_renamed_layers.get(entity.layer)
+            if updated_name is None or updated_name == entity.layer:
+                continue
+            entity.layer = updated_name
+            changes += 1
+
+        if changes == 0:
+            self.statusBar().showMessage("No se realizaron cambios en los nombres de capas")
+            return
+
+        self._refresh_from_entity_geometries()
+        if adjusted_names:
+            self.statusBar().showMessage(
+                "Capas renombradas; se ajustaron caracteres incompatibles con DXF"
+            )
+        else:
+            self.statusBar().showMessage("Capas renombradas correctamente")
 
     def _remove_layer_item(self, layer: str) -> None:
         for index in range(self.layer_list.count()):

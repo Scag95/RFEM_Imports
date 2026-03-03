@@ -39,3 +39,4 @@ def segments_are_connected(segment_a: Segment3, segment_b: Segment3, tol: float)
         or point_to_segment_distance(b_start, segment_a) <= tol
         or point_to_segment_distance(b_end, segment_a) <= tol
     )
+
