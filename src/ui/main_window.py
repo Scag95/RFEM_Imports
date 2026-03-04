@@ -1,8 +1,7 @@
 import os
 from collections import defaultdict
 
-import ezdxf
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QAction, QColor
 from PyQt6.QtWidgets import (
     QDialog,
@@ -21,9 +20,6 @@ from PyQt6.QtWidgets import (
 
 from src.core.dxf_utils import collect_entity_geometries, flatten_segments_for_viewer
 from src.core.geometry import EntityGeometry
-from src.domain.structural_processor import StructuralProcessor
-from src.ui.dialogs import DeleteLayerDialog, RenameLayersDialog, ResultTextDialog
-from src.ui.viewer_3d import DXFViewer3D
 
 DXF_INVALID_LAYER_CHAR_REPLACEMENTS = str.maketrans(
     {
@@ -49,7 +45,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("RFEM DXF Manager - 3D Viewer")
         self.resize(1400, 900)
 
-        self.viewer = DXFViewer3D()
+        self.viewer = None
         self.layer_counts: dict[str, int] = {}
         self.current_file_path = ""
         self.entity_geometries: list[EntityGeometry] = []
@@ -78,7 +74,10 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(4)
-        left_layout.addWidget(self.viewer)
+        self.viewer_host = QWidget()
+        self.viewer_host_layout = QVBoxLayout(self.viewer_host)
+        self.viewer_host_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(self.viewer_host)
         left_layout.addWidget(self.info_label)
         left_layout.setStretch(0, 1)
         left_layout.setStretch(1, 0)
@@ -89,6 +88,20 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         self.statusBar().showMessage("Listo")
         self._create_menu()
+        QTimer.singleShot(0, self._initialize_viewer)
+
+    def _initialize_viewer(self) -> None:
+        self._ensure_viewer()
+
+    def _ensure_viewer(self):
+        if self.viewer is not None:
+            return self.viewer
+
+        from src.ui.viewer_3d import DXFViewer3D
+
+        self.viewer = DXFViewer3D()
+        self.viewer_host_layout.addWidget(self.viewer)
+        return self.viewer
 
     def _create_menu(self) -> None:
         file_menu = self.menuBar().addMenu("Archivo")
@@ -106,17 +119,17 @@ class MainWindow(QMainWindow):
         file_menu.addAction(exit_action)
 
         tools_menu = self.menuBar().addMenu("Herramientas")
-        remove_layer_action = QAction("Eliminar capa", self)
-        remove_layer_action.triggered.connect(self.open_delete_layer_dialog)
-        tools_menu.addAction(remove_layer_action)
+        # remove_layer_action = QAction("Eliminar capa", self)
+        # remove_layer_action.triggered.connect(self.open_delete_layer_dialog)
+        # tools_menu.addAction(remove_layer_action)
 
-        rename_layers_action = QAction("Renombrar capas", self)
-        rename_layers_action.triggered.connect(self.open_rename_layers_dialog)
-        tools_menu.addAction(rename_layers_action)
+        # rename_layers_action = QAction("Renombrar capas", self)
+        # rename_layers_action.triggered.connect(self.open_rename_layers_dialog)
+        # tools_menu.addAction(rename_layers_action)
 
-        detect_connections_action = QAction("Detectar montantes-durmientes", self)
-        detect_connections_action.triggered.connect(self.detect_montantes_durmientes)
-        tools_menu.addAction(detect_connections_action)
+        # detect_connections_action = QAction("Detectar montantes-durmientes", self)
+        # detect_connections_action.triggered.connect(self.detect_montantes_durmientes)
+        # tools_menu.addAction(detect_connections_action)
 
         merge_action = QAction("Unir durmientes y testeros", self)
         merge_action.triggered.connect(self.merge_durmientes_testeros)
@@ -168,7 +181,8 @@ class MainWindow(QMainWindow):
             self.layer_counts[entity.layer] += len(entity.segments)
 
         if not self.entity_geometries:
-            self.viewer.clear()
+            if self.viewer is not None:
+                self.viewer.clear()
             self.layer_list.clear()
             self._update_info_after_layer_delete()
             return
@@ -176,7 +190,7 @@ class MainWindow(QMainWindow):
         layer_counts = dict(self.layer_counts)
         segments = flatten_segments_for_viewer(self.entity_geometries)
         layer_colors = self._build_layer_colors(list(layer_counts.keys()))
-        self.viewer.draw_segments(segments, layer_colors)
+        self._ensure_viewer().draw_segments(segments, layer_colors)
 
         self.layer_list.blockSignals(True)
         self.layer_list.clear()
@@ -191,6 +205,9 @@ class MainWindow(QMainWindow):
         self._update_info_after_layer_delete()
 
     def merge_montantes_union(self) -> None:
+        from src.domain.structural_processor import StructuralProcessor
+        from src.ui.dialogs import ResultTextDialog
+
         if not self.entity_geometries:
             QMessageBox.information(
                 self,
@@ -225,6 +242,9 @@ class MainWindow(QMainWindow):
         ResultTextDialog(title="Resultado: unir montantes union", text=report, parent=self).exec()
 
     def merge_montantes_esquinas(self) -> None:
+        from src.domain.structural_processor import StructuralProcessor
+        from src.ui.dialogs import ResultTextDialog
+
         if not self.entity_geometries:
             QMessageBox.information(
                 self,
@@ -259,6 +279,9 @@ class MainWindow(QMainWindow):
         ResultTextDialog(title="Resultado: unir montantes esquinas", text=report, parent=self).exec()
 
     def merge_durmientes_testeros(self) -> None:
+        from src.domain.structural_processor import StructuralProcessor
+        from src.ui.dialogs import ResultTextDialog
+
         if not self.entity_geometries:
             QMessageBox.information(
                 self,
@@ -293,6 +316,9 @@ class MainWindow(QMainWindow):
         ResultTextDialog(title="Resultado: unir durmientes y testeros", text=report, parent=self).exec()
         
     def detect_montantes_durmientes(self) -> None:
+        from src.domain.structural_processor import StructuralProcessor
+        from src.ui.dialogs import ResultTextDialog
+
         if not self.entity_geometries:
             QMessageBox.information(
                 self,
@@ -346,6 +372,8 @@ class MainWindow(QMainWindow):
         ).exec()
 
     def save_dxf_file(self) -> None:
+        from ezdxf import new
+
         if not self.entity_geometries:
             QMessageBox.information(
                 self,
@@ -379,7 +407,7 @@ class MainWindow(QMainWindow):
                     entity.layer = safe_layer_map[entity.layer]
                 self._refresh_from_entity_geometries()
 
-            doc = ezdxf.new("R2010")
+            doc = new("R2010")
             msp = doc.modelspace()
 
             existing_layers = {layer.dxf.name for layer in doc.layers}
@@ -411,6 +439,8 @@ class MainWindow(QMainWindow):
             )
 
     def load_dxf_file(self) -> None:
+        from ezdxf import readfile
+
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Seleccionar archivo DXF",
@@ -421,12 +451,13 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            doc = ezdxf.readfile(file_path)
+            doc = readfile(file_path)
             msp = doc.modelspace()
 
             entity_geometries, layer_counts = collect_entity_geometries(msp)
             if not entity_geometries:
-                self.viewer.clear()
+                if self.viewer is not None:
+                    self.viewer.clear()
                 self.layer_counts.clear()
                 self.current_file_path = file_path
                 self.entity_geometries = []
@@ -440,7 +471,7 @@ class MainWindow(QMainWindow):
             self.entity_geometries = entity_geometries
             segments = flatten_segments_for_viewer(entity_geometries)
             layer_colors = self._build_layer_colors(list(layer_counts.keys()))
-            self.viewer.draw_segments(segments, layer_colors)
+            self._ensure_viewer().draw_segments(segments, layer_colors)
 
             self.layer_list.clear()
             for layer in sorted(layer_counts.keys()):
@@ -468,9 +499,12 @@ class MainWindow(QMainWindow):
         if not isinstance(layer, str):
             return
         visible = item.checkState() == Qt.CheckState.Checked
-        self.viewer.set_layer_visible(layer, visible)
+        if self.viewer is not None:
+            self.viewer.set_layer_visible(layer, visible)
 
     def open_delete_layer_dialog(self) -> None:
+        from src.ui.dialogs import DeleteLayerDialog
+
         layers = sorted(self.layer_counts.keys())
         if not layers:
             QMessageBox.information(
@@ -488,7 +522,7 @@ class MainWindow(QMainWindow):
         if not layer_to_remove:
             return
 
-        if not self.viewer.remove_layer(layer_to_remove):
+        if self.viewer is None or not self.viewer.remove_layer(layer_to_remove):
             QMessageBox.warning(
                 self,
                 "Eliminar capa",
@@ -505,6 +539,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Capa eliminada: {layer_to_remove}")
 
     def open_rename_layers_dialog(self) -> None:
+        from src.ui.dialogs import RenameLayersDialog
+
         layers = sorted(self.layer_counts.keys())
         if not layers:
             QMessageBox.information(

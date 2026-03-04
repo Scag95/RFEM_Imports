@@ -71,26 +71,26 @@ class ExcelPasteTableWidget(QTableWidget):
                 item.setText(value.strip())
 
 
-class DeleteLayerDialog(QDialog):
-    def __init__(self, layers: list[str], parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Eliminar capa")
-        self.setModal(True)
-        self.setMinimumWidth(360)
+# class DeleteLayerDialog(QDialog):
+#     def __init__(self, layers: list[str], parent: QWidget | None = None) -> None:
+#         super().__init__(parent)
+#         self.setWindowTitle("Eliminar capa")
+#         self.setModal(True)
+#         self.setMinimumWidth(360)
 
-        self.layer_combo = QComboBox(self)
-        self.layer_combo.addItems(layers)
+#         self.layer_combo = QComboBox(self)
+#         self.layer_combo.addItems(layers)
 
-        self.delete_button = QPushButton("Eliminar", self)
-        self.delete_button.clicked.connect(self.accept)
+#         self.delete_button = QPushButton("Eliminar", self)
+#         self.delete_button.clicked.connect(self.accept)
 
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Selecciona la capa a eliminar:"))
-        layout.addWidget(self.layer_combo)
-        layout.addWidget(self.delete_button)
+#         layout = QVBoxLayout(self)
+#         layout.addWidget(QLabel("Selecciona la capa a eliminar:"))
+#         layout.addWidget(self.layer_combo)
+#         layout.addWidget(self.delete_button)
 
-    def selected_layer(self) -> str:
-        return self.layer_combo.currentText().strip()
+#     def selected_layer(self) -> str:
+#         return self.layer_combo.currentText().strip()
 
 
 class ResultTextDialog(QDialog):
@@ -112,64 +112,64 @@ class ResultTextDialog(QDialog):
         layout.addWidget(close_button)
 
 
-class RenameLayersDialog(QDialog):
-    def __init__(self, layers: list[str], parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Renombrar capas")
-        self.setModal(True)
-        self.resize(760, 480)
+# class RenameLayersDialog(QDialog):
+#     def __init__(self, layers: list[str], parent: QWidget | None = None) -> None:
+#         super().__init__(parent)
+#         self.setWindowTitle("Renombrar capas")
+#         self.setModal(True)
+#         self.resize(760, 480)
 
-        self.layer_table = ExcelPasteTableWidget(len(layers), 2, self)
-        self.layer_table.setHorizontalHeaderLabels(["Capa actual", "Nuevo nombre"])
-        self.layer_table.verticalHeader().setVisible(False)
-        self.layer_table.setAlternatingRowColors(True)
-        self.layer_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
-        self.layer_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.layer_table.setEditTriggers(
-            QAbstractItemView.EditTrigger.DoubleClicked
-            | QAbstractItemView.EditTrigger.EditKeyPressed
-            | QAbstractItemView.EditTrigger.AnyKeyPressed
-        )
+#         self.layer_table = ExcelPasteTableWidget(len(layers), 2, self)
+#         self.layer_table.setHorizontalHeaderLabels(["Capa actual", "Nuevo nombre"])
+#         self.layer_table.verticalHeader().setVisible(False)
+#         self.layer_table.setAlternatingRowColors(True)
+#         self.layer_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
+#         self.layer_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+#         self.layer_table.setEditTriggers(
+#             QAbstractItemView.EditTrigger.DoubleClicked
+#             | QAbstractItemView.EditTrigger.EditKeyPressed
+#             | QAbstractItemView.EditTrigger.AnyKeyPressed
+#         )
 
-        header = self.layer_table.horizontalHeader()
-        header.setStretchLastSection(True)
+#         header = self.layer_table.horizontalHeader()
+#         header.setStretchLastSection(True)
 
-        for row, layer in enumerate(layers):
-            self.layer_table.setItem(row, 0, QTableWidgetItem(layer))
-            self.layer_table.setItem(
-                row,
-                1,
-                QTableWidgetItem(DEFAULT_LAYER_RENAMES.get(layer, layer)),
-            )
+#         for row, layer in enumerate(layers):
+#             self.layer_table.setItem(row, 0, QTableWidgetItem(layer))
+#             self.layer_table.setItem(
+#                 row,
+#                 1,
+#                 QTableWidgetItem(DEFAULT_LAYER_RENAMES.get(layer, layer)),
+#             )
 
-        if layers:
-            self.layer_table.setCurrentCell(0, 0)
+#         if layers:
+#             self.layer_table.setCurrentCell(0, 0)
 
-        self.accept_button = QPushButton("Aplicar", self)
-        self.accept_button.clicked.connect(self.accept)
+#         self.accept_button = QPushButton("Aplicar", self)
+#         self.accept_button.clicked.connect(self.accept)
 
-        self.cancel_button = QPushButton("Cancelar", self)
-        self.cancel_button.clicked.connect(self.reject)
+#         self.cancel_button = QPushButton("Cancelar", self)
+#         self.cancel_button.clicked.connect(self.reject)
 
-        buttons_layout = QHBoxLayout()
-        buttons_layout.addStretch(1)
-        buttons_layout.addWidget(self.cancel_button)
-        buttons_layout.addWidget(self.accept_button)
+#         buttons_layout = QHBoxLayout()
+#         buttons_layout.addStretch(1)
+#         buttons_layout.addWidget(self.cancel_button)
+#         buttons_layout.addWidget(self.accept_button)
 
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Edita o pega desde Excel en la tabla (Ctrl+V):"))
-        layout.addWidget(self.layer_table)
-        layout.addLayout(buttons_layout)
+#         layout = QVBoxLayout(self)
+#         layout.addWidget(QLabel("Edita o pega desde Excel en la tabla (Ctrl+V):"))
+#         layout.addWidget(self.layer_table)
+#         layout.addLayout(buttons_layout)
 
-    def renamed_layers(self) -> dict[str, str]:
-        renamed: dict[str, str] = {}
-        for row in range(self.layer_table.rowCount()):
-            current_item = self.layer_table.item(row, 0)
-            new_item = self.layer_table.item(row, 1)
-            if current_item is None or new_item is None:
-                continue
-            current_name = current_item.text().strip()
-            new_name = new_item.text().strip()
-            if current_name:
-                renamed[current_name] = new_name
-        return renamed
+    # def renamed_layers(self) -> dict[str, str]:
+    #     renamed: dict[str, str] = {}
+    #     for row in range(self.layer_table.rowCount()):
+    #         current_item = self.layer_table.item(row, 0)
+    #         new_item = self.layer_table.item(row, 1)
+    #         if current_item is None or new_item is None:
+    #             continue
+    #         current_name = current_item.text().strip()
+    #         new_name = new_item.text().strip()
+    #         if current_name:
+    #             renamed[current_name] = new_name
+    #     return renamed

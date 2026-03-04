@@ -38,3 +38,17 @@ RFEM_Imports/
    python main.py
    ```
 4. Navegar a **Archivo > Cargar DXF** para comenzar.
+
+## Generar EXE en Windows
+
+1. Ejecuta el script de compilacion desde la raiz del proyecto:
+   ```powershell
+   .\build_exe.ps1
+   ```
+2. Si quieres forzar una compilacion limpia:
+   ```powershell
+   .\build_exe.ps1 -Clean
+   ```
+3. El ejecutable quedara en `dist\RFEM_Imports\RFEM_Imports.exe`.
+
+El script usa `venv\Scripts\python.exe` si existe; en caso contrario usa el `python` disponible en el sistema. Tambien instala automaticamente las dependencias de build definidas en `requirements-build.txt`.
