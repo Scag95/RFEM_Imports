@@ -1,6 +1,6 @@
 import os
 from collections import defaultdict
-
+from src.core.geometry import corregir_direccion_barras
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QAction, QColor
 from PyQt6.QtWidgets import (
@@ -119,6 +119,11 @@ class MainWindow(QMainWindow):
         file_menu.addAction(exit_action)
 
         tools_menu = self.menuBar().addMenu("Herramientas")
+        correct_bars_action = QAction("Corregir dirección barras", self)
+        correct_bars_action.triggered.connect(self.correct_bars_direction)
+        tools_menu.addAction(correct_bars_action)
+
+
         # remove_layer_action = QAction("Eliminar capa", self)
         # remove_layer_action.triggered.connect(self.open_delete_layer_dialog)
         # tools_menu.addAction(remove_layer_action)
@@ -142,6 +147,11 @@ class MainWindow(QMainWindow):
         merge_corner_action = QAction("Unir montantes esquinas", self)
         merge_corner_action.triggered.connect(self.merge_montantes_esquinas)
         tools_menu.addAction(merge_corner_action)
+
+
+
+
+
 
     def _build_layer_colors(self, layers: list[str]) -> dict[str, QColor]:
         colors: dict[str, QColor] = {}
@@ -314,6 +324,28 @@ class MainWindow(QMainWindow):
         self._refresh_from_entity_geometries()
 
         ResultTextDialog(title="Resultado: unir durmientes y testeros", text=report, parent=self).exec()
+        
+    def correct_bars_direction(self) -> None:
+        from src.core.geometry import corregir_direccion_barras
+        from src.ui.dialogs import ResultTextDialog
+
+        if not self.entity_geometries:
+            QMessageBox.information(
+                self,
+                "Corregir dirección barras",
+                "Carga primero un archivo DXF con geometria.",
+            )
+            return
+
+        self.entity_geometries, corrected_count = corregir_direccion_barras(
+            self.entity_geometries,
+            tolerance_z=0.1
+        )
+        
+        self._refresh_from_entity_geometries()
+
+        report = f"Se corrigieron {corrected_count} barras horizontales a sentido antihorario."
+        ResultTextDialog(title="Resultado: corregir dirección barras", text=report, parent=self).exec()
         
     def detect_montantes_durmientes(self) -> None:
         from src.domain.structural_processor import StructuralProcessor

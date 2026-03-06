@@ -112,6 +112,8 @@ class ResultTextDialog(QDialog):
         layout.addWidget(close_button)
 
 
+
+
 # class RenameLayersDialog(QDialog):
 #     def __init__(self, layers: list[str], parent: QWidget | None = None) -> None:
 #         super().__init__(parent)
