@@ -1,24 +1,14 @@
 from __future__ import annotations
 import math
-from dataclasses import dataclass
-
-
 from collections import defaultdict
-from math import isclose
-from typing import Iterable
-
-
 from dataclasses import dataclass
-from collections import defaultdict
-from typing import Dict, List, Tuple
 
 from shapely.geometry import LineString
-from shapely.ops import unary_union, polygonize
 from shapely.geometry.polygon import orient
+from shapely.ops import polygonize, unary_union
 
 Point3 = tuple[float, float, float]
 Segment3 = tuple[float, float, float, float, float, float]
-Segment3D = tuple[float, float, float, float, float, float]
 Segment2D = tuple[float, float, float, float]
 
 @dataclass
@@ -26,7 +16,6 @@ class EntityGeometry:
     handle: str
     layer: str
     segments: list[Segment3]
-    segments: list[tuple[float, float, float, float, float, float]]
 
 
 
@@ -175,6 +164,7 @@ def agrupar_por_cota_z(
         _, _, z_ref = item
         if abs(z_ref - z_ref_actual) <= tolerance_z:
             actual.append(item)
+            z_ref_actual = z_ref
         else:
             grupos.append(actual)
             actual = [item]

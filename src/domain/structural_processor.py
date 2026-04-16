@@ -531,9 +531,6 @@ class StructuralProcessor:
             else:
                 merged_groups_pasante += 1
 
-            if len(group) < 2:
-                continue
-
             first = group[0]
             second = group[1]
             fx, fy = self._entity_xy_reference(first)

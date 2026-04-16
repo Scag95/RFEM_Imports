@@ -434,30 +434,39 @@ class MainWindow(QMainWindow):
         try:
             layer_names = sorted({entity.layer for entity in self.entity_geometries})
             safe_layer_map, adjusted_names = self._build_safe_layer_map(layer_names)
-            if adjusted_names:
-                for entity in self.entity_geometries:
-                    entity.layer = safe_layer_map[entity.layer]
-                self._refresh_from_entity_geometries()
+
+            # Determinar nombre de capa efectivo sin mutar en memoria todavía
+            effective_layer = {
+                entity.handle: safe_layer_map[entity.layer] if adjusted_names else entity.layer
+                for entity in self.entity_geometries
+            }
 
             doc = new("R2010")
             msp = doc.modelspace()
 
             existing_layers = {layer.dxf.name for layer in doc.layers}
             for entity in self.entity_geometries:
-                if entity.layer not in existing_layers:
-                    doc.layers.new(name=entity.layer)
-                    existing_layers.add(entity.layer)
+                lname = effective_layer[entity.handle]
+                if lname not in existing_layers:
+                    doc.layers.new(name=lname)
+                    existing_layers.add(lname)
 
             for entity in self.entity_geometries:
+                lname = effective_layer[entity.handle]
                 for x1, y1, z1, x2, y2, z2 in entity.segments:
                     msp.add_line(
                         (float(x1), float(y1), float(z1)),
                         (float(x2), float(y2), float(z2)),
-                        dxfattribs={"layer": entity.layer},
+                        dxfattribs={"layer": lname},
                     )
 
             doc.saveas(file_path)
+
+            # Mutar en memoria solo tras escritura exitosa
             if adjusted_names:
+                for entity in self.entity_geometries:
+                    entity.layer = effective_layer[entity.handle]
+                self._refresh_from_entity_geometries()
                 self.statusBar().showMessage(
                     f"DXF guardado: {file_path} | Se ajustaron nombres de capa para DXF"
                 )

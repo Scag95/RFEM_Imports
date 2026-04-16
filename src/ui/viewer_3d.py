@@ -142,6 +142,9 @@ class DXFViewer3D(QWidget):
     ) -> None:
         self.clear()
 
+        if not segments:
+            return
+
         layer_vertices: dict[str, list[float]] = defaultdict(list)
         min_x = min_y = min_z = float("inf")
         max_x = max_y = max_z = float("-inf")
