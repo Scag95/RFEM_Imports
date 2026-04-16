@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude plugin *)",
+      "Bash(echo \"EXIT_CODE: $?\")",
+      "Bash(CLAUDE_CODE_GIT_BASH_PATH=\"C:/Program Files/Git/bin/bash.exe\" claude plugin marketplace add JuliusBrussee/caveman)",
+      "Bash(where bash *)",
+      "Bash(where git *)",
+      "Read(//c/Program Files/Git/**)",
+      "Read(//c/Git/**)",
+      "Bash(CLAUDE_CODE_GIT_BASH_PATH=\"C:/Users/albertorafael.perez/AppData/Local/Programs/Git/usr/bin/bash.exe\" claude plugin marketplace add JuliusBrussee/caveman)",
+      "Bash(CLAUDE_CODE_GIT_BASH_PATH='C:\\\\Users\\\\albertorafael.perez\\\\AppData\\\\Local\\\\Programs\\\\Git\\\\usr\\\\bin\\\\bash.exe' claude plugin marketplace add JuliusBrussee/caveman)",
+      "Bash(CLAUDE_CODE_GIT_BASH_PATH='C:\\\\Users\\\\albertorafael.perez\\\\AppData\\\\Local\\\\Programs\\\\Git\\\\usr\\\\bin\\\\bash.exe' claude plugin install caveman@caveman)",
+      "Bash(git commit *)",
+      "Bash(git add *)"
+    ]
+  }
+}

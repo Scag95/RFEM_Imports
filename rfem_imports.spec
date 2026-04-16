@@ -18,22 +18,12 @@ hiddenimports = [
 excludes = [
     # Stdlib no utilizado en runtime
     "tkinter",
-    "unittest",
     "pydoc",
     "doctest",
     "distutils",
     "setuptools",
     "pip",
     "email",
-    "html",
-    "http",
-    "urllib",
-    "xmlrpc",
-    "xml.etree",
-    "multiprocessing",
-    "concurrent",
-    "asyncio",
-    "ctypes.test",
     "lib2to3",
     # Submódulos de NumPy innecesarios en runtime
     "numpy.f2py",
