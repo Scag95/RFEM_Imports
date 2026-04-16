@@ -15,6 +15,43 @@ hiddenimports = [
     "PyQt6.Qt3DRender",
 ]
 
+excludes = [
+    # Stdlib no utilizado en runtime
+    "tkinter",
+    "unittest",
+    "pydoc",
+    "doctest",
+    "distutils",
+    "setuptools",
+    "pip",
+    "email",
+    "html",
+    "http",
+    "urllib",
+    "xmlrpc",
+    "xml.etree",
+    "multiprocessing",
+    "concurrent",
+    "asyncio",
+    "ctypes.test",
+    "lib2to3",
+    # Submódulos de NumPy innecesarios en runtime
+    "numpy.f2py",
+    "numpy.testing",
+    "numpy.tests",
+    "numpy.distutils",
+    # Paquetes científicos/visualización no presentes en este proyecto
+    "matplotlib",
+    "scipy",
+    "pandas",
+    "IPython",
+    "PIL",
+]
+
+# UPX desactivado: en builds de directorio con SSD la descompresion en
+# startup es mas lenta que leer archivos sin comprimir del disco.
+upx_exclude_list = []
+
 
 a = Analysis(
     ["main.py"],
@@ -25,9 +62,9 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=excludes,
     noarchive=False,
-    optimize=0,
+    optimize=2,
 )
 
 pyz = PYZ(a.pure)
@@ -41,7 +78,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
 )
@@ -51,7 +88,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=True,
-    upx_exclude=[],
+    upx=False,
+    upx_exclude=upx_exclude_list,
     name="RFEM_Imports",
 )

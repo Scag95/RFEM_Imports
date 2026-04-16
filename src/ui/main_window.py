@@ -1,7 +1,7 @@
 import os
 from collections import defaultdict
 from src.core.geometry import corregir_direccion_barras
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QColor
 from PyQt6.QtWidgets import (
     QDialog,
@@ -88,10 +88,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         self.statusBar().showMessage("Listo")
         self._create_menu()
-        QTimer.singleShot(0, self._initialize_viewer)
-
-    def _initialize_viewer(self) -> None:
-        self._ensure_viewer()
 
     def _ensure_viewer(self):
         if self.viewer is not None:

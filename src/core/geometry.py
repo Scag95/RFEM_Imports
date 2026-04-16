@@ -3,10 +3,6 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass
 
-from shapely.geometry import LineString
-from shapely.geometry.polygon import orient
-from shapely.ops import polygonize, unary_union
-
 Point3 = tuple[float, float, float]
 Segment3 = tuple[float, float, float, float, float, float]
 Segment2D = tuple[float, float, float, float]
@@ -193,6 +189,10 @@ def construir_mapa_bordes_orientados(
     - exteriores CCW
     - interiores CW
     """
+    from shapely.geometry import LineString
+    from shapely.geometry.polygon import orient
+    from shapely.ops import polygonize, unary_union
+
     lines = []
 
     for _, seg in segmentos_grupo:
