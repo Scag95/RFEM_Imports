@@ -5,6 +5,7 @@ import sys
 os.environ.setdefault("QT3D_RENDERER", "opengl")
 os.environ.setdefault("QT_OPENGL", "desktop")
 
+# pyrefly: ignore [missing-import]
 from PyQt6.QtWidgets import QApplication
 
 # Importamos la clase MainWindow desde la nueva estructura modular

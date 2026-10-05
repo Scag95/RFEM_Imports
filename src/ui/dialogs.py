@@ -2,6 +2,7 @@ from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QCheckBox,
     QComboBox,
     QDialog,
     QHBoxLayout,
@@ -175,3 +176,138 @@ class ResultTextDialog(QDialog):
     #         if current_name:
     #             renamed[current_name] = new_name
     #     return renamed
+
+class PreprocesarCadworkDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Preprocesar y clasificar (Cadwork)")
+        self.setModal(True)
+        self.setMinimumWidth(480)
+
+        from PyQt6.QtWidgets import QFormLayout, QDoubleSpinBox, QDialogButtonBox
+
+        layout = QVBoxLayout(self)
+
+        instructions = QLabel(
+            "Configura las tolerancias geométricas (en milímetros) para el pipeline de Cadwork:\n"
+            "- Las uniones de esquina se detectarán en paneles cruzados en ángulo.\n"
+            "- Los extremos libres desclasifican montantes de unión aislados."
+        )
+        instructions.setWordWrap(True)
+        instructions.setStyleSheet("margin-bottom: 15px; font-size: 11px; color: #444444; font-weight: bold;")
+        layout.addWidget(instructions)
+
+        form = QFormLayout()
+
+        # Corner Esquinas Tolerance
+        self.tol_esquinas_spin = QDoubleSpinBox(self)
+        self.tol_esquinas_spin.setRange(0.0, 1000.0)
+        self.tol_esquinas_spin.setSingleStep(10.0)
+        self.tol_esquinas_spin.setValue(150.0)
+        self.tol_esquinas_spin.setSuffix(" mm")
+        form.addRow("Tolerancia de Esquinas:", self.tol_esquinas_spin)
+        
+        tol_esquinas_help = QLabel("Distancia máxima en planta para agrupar y fusionar montantes en esquinas cruzadas (ej. 150 mm representa el espesor del muro).")
+        tol_esquinas_help.setWordWrap(True)
+        tol_esquinas_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 8px;")
+        form.addRow("", tol_esquinas_help)
+
+        # Facade Ends Isolation Tolerance
+        self.tol_extremo_spin = QDoubleSpinBox(self)
+        self.tol_extremo_spin.setRange(0.0, 1000.0)
+        self.tol_extremo_spin.setSingleStep(10.0)
+        self.tol_extremo_spin.setValue(200.0)
+        self.tol_extremo_spin.setSuffix(" mm")
+        form.addRow("Aislamiento Extremos Fachada:", self.tol_extremo_spin)
+        
+        tol_extremo_help = QLabel("Distancia mínima a otro panel. Si no hay ningún vecino en este radio, el extremo se considera final de fachada y el montante de unión se convierte a montante simple.")
+        tol_extremo_help.setWordWrap(True)
+        tol_extremo_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 8px;")
+        form.addRow("", tol_extremo_help)
+
+        # XY Wall Proximity Tolerance
+        self.tol_xy_spin = QDoubleSpinBox(self)
+        self.tol_xy_spin.setRange(0.0, 1000.0)
+        self.tol_xy_spin.setSingleStep(10.0)
+        self.tol_xy_spin.setValue(150.0)
+        self.tol_xy_spin.setSuffix(" mm")
+        form.addRow("Proximidad Paneles (XY):", self.tol_xy_spin)
+        
+        tol_xy_help = QLabel("Tolerancia máxima horizontal en planta para asociar montantes, dinteles y alfeizares a la línea directriz del panel.")
+        tol_xy_help.setWordWrap(True)
+        tol_xy_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 8px;")
+        form.addRow("", tol_xy_help)
+
+        # Z Plate Proximity Tolerance
+        self.tol_z_spin = QDoubleSpinBox(self)
+        self.tol_z_spin.setRange(0.0, 1000.0)
+        self.tol_z_spin.setSingleStep(10.0)
+        self.tol_z_spin.setValue(100.0)
+        self.tol_z_spin.setSuffix(" mm")
+        form.addRow("Tolerancia de Placas (Z):", self.tol_z_spin)
+        
+        tol_z_help = QLabel("Desviación vertical máxima permitida para considerar que la cabeza o el pie de un montante coincide con el testero o durmiente de su panel.")
+        tol_z_help.setWordWrap(True)
+        tol_z_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 8px;")
+        form.addRow("", tol_z_help)
+
+        # Hueco (Windows) Proximity Tolerance
+        self.tol_hueco_spin = QDoubleSpinBox(self)
+        self.tol_hueco_spin.setRange(0.0, 1000.0)
+        self.tol_hueco_spin.setSingleStep(10.0)
+        self.tol_hueco_spin.setValue(100.0)
+        self.tol_hueco_spin.setSuffix(" mm")
+        form.addRow("Proximidad a Huecos (planta):", self.tol_hueco_spin)
+        
+        tol_hueco_help = QLabel("Tolerancia horizontal en planta para identificar los montantes laterales de ventanas/puertas (jambas) y extender dinteles y alfeizares hacia ellos.")
+        tol_hueco_help.setWordWrap(True)
+        tol_hueco_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 8px;")
+        form.addRow("", tol_hueco_help)
+
+        # Cota de Nivel Z Height
+        self.tol_cota_spin = QDoubleSpinBox(self)
+        self.tol_cota_spin.setRange(0.0, 5000.0)
+        self.tol_cota_spin.setSingleStep(25.0)
+        self.tol_cota_spin.setValue(1125.0)
+        self.tol_cota_spin.setSuffix(" mm")
+        form.addRow("Altura Cota de Nivel (Z):", self.tol_cota_spin)
+        
+        tol_cota_help = QLabel("Distancia vertical en Z por encima de la base del durmiente para trazar la línea de cota de nivel continua (ej. 1125 mm).")
+        tol_cota_help.setWordWrap(True)
+        tol_cota_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 12px;")
+        form.addRow("", tol_cota_help)
+
+        # Isolated Panels Checkbox
+        self.isolated_as_pasante_check = QCheckBox("Considerar paneles aislados como Pasantes", self)
+        self.isolated_as_pasante_check.setChecked(True)
+        form.addRow("", self.isolated_as_pasante_check)
+        
+        isolated_help = QLabel("Si un panel no tiene vecinos arriba ni abajo (ej. plantas únicas), se clasificará como Pasante si está marcado, o No Pasante si se desmarca.")
+        isolated_help.setWordWrap(True)
+        isolated_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 15px;")
+        form.addRow("", isolated_help)
+
+        layout.addLayout(form)
+
+        # Buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            self
+        )
+        button_box.button(QDialogButtonBox.StandardButton.Ok).setText("Aplicar")
+        button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
+        
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def get_tolerances(self) -> tuple[float, float, float, float, float, float, bool]:
+        return (
+            self.tol_esquinas_spin.value(),
+            self.tol_extremo_spin.value(),
+            self.tol_xy_spin.value(),
+            self.tol_z_spin.value(),
+            self.tol_hueco_spin.value(),
+            self.tol_cota_spin.value(),
+            self.isolated_as_pasante_check.isChecked()
+        )

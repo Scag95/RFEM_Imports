@@ -37,6 +37,99 @@ DXF_INVALID_LAYER_CHAR_REPLACEMENTS = str.maketrans(
     }
 )
 
+PREDEFINED_LAYERS_PALETTE: list[tuple[int, QColor]] = [
+    (1, QColor(255, 63, 63)),      # Rojo
+    (2, QColor(255, 255, 63)),     # Amarillo
+    (3, QColor(63, 255, 63)),      # Verde
+    (4, QColor(63, 255, 255)),     # Cian
+    (5, QColor(63, 63, 255)),      # Azul
+    (6, QColor(255, 63, 255)),     # Magenta
+    (8, QColor(128, 128, 128)),    # Gris oscuro
+    (9, QColor(192, 192, 192)),    # Gris claro
+    (10, QColor(255, 0, 0)),       # Rojo puro
+    (30, QColor(255, 127, 0)),     # Naranja
+    (50, QColor(212, 175, 55)),    # Oro / Amarillo oscuro
+    (70, QColor(127, 255, 0)),     # Verde lima
+    (90, QColor(0, 192, 0)),       # Verde oscuro
+    (110, QColor(0, 255, 127)),    # Verde primavera
+    (130, QColor(0, 192, 192)),    # Cian oscuro
+    (150, QColor(0, 127, 255)),    # Azul claro
+    (170, QColor(0, 0, 128)),      # Azul marino
+    (190, QColor(127, 0, 255)),    # Púrpura
+    (210, QColor(192, 0, 192)),    # Violeta
+    (230, QColor(255, 0, 127)),    # Rosa
+    (14, QColor(150, 75, 0)),      # Marrón
+    (24, QColor(255, 191, 0)),     # Ámbar
+    (34, QColor(128, 128, 0)),     # Oliva
+    (44, QColor(34, 139, 34)),     # Verde bosque
+    (54, QColor(0, 128, 128)),     # Teal
+    (64, QColor(135, 206, 235)),   # Cielo
+    (74, QColor(75, 0, 130)),      # Índigo
+    (84, QColor(238, 130, 238)),   # Violeta claro
+    (104, QColor(46, 204, 113)),   # Esmeralda
+    (124, QColor(52, 152, 219)),   # Azul belice
+    (144, QColor(155, 89, 182)),   # Amatista
+    (164, QColor(241, 196, 15)),   # Girasol
+    (184, QColor(230, 126, 34)),   # Zanahoria
+    (204, QColor(231, 76, 60)),    # Alizarina
+]
+
+PREDEFINED_LAYER_MAP: dict[str, tuple[int, QColor]] = {
+    # DURMIENTES (Verdes)
+    "DURMIENTE (PASANTE)": (90, QColor(0, 192, 0)),           # Verde oscuro
+    "DURMIENTE (NO PASANTE)": (70, QColor(127, 255, 0)),      # Verde lima
+    
+    # TESTEROS (Rojos)
+    "TESTERO (PASANTE)": (10, QColor(255, 0, 0)),             # Rojo puro
+    "TESTERO (NO PASANTE)": (204, QColor(231, 76, 60)),        # Rojo coral / Alizarina
+    
+    # UNION (Púrpuras)
+    "MONTANTES UNION (PASANTE)": (190, QColor(127, 0, 255)),   # Púrpura
+    "MONTANTES UNION (NO PASANTE)": (210, QColor(192, 0, 192)), # Violeta
+    
+    # ESQUINAS (Naranjas/Amarillos)
+    "MONTANTES DE ESQUINA (PASANTE)": (30, QColor(255, 127, 0)), # Naranja
+    "MONTANTES DE ESQUINA (NO PASANTE)": (164, QColor(241, 196, 15)), # Girasol / Amarillo
+    "MONTANTES ESQUINA (PASANTE)": (30, QColor(255, 127, 0)),
+    "MONTANTES ESQUINA (NO PASANTE)": (164, QColor(241, 196, 15)),
+    
+    # SIMPLES / LARGOS (Azules)
+    "MONTANTES SIMPLES (PASANTE)": (150, QColor(0, 127, 255)), # Azul claro
+    "MONTANTES SIMPLES (NO PASANTE)": (170, QColor(0, 0, 128)),  # Azul marino
+    "MONTANTES LARGOS (PASANTE)": (150, QColor(0, 127, 255)),
+    "MONTANTES LARGOS (NO PASANTE)": (170, QColor(0, 0, 128)),
+    
+    # CORTOS (Grises)
+    "MONTANTES CORTOS (PASANTE)": (8, QColor(128, 128, 128)),  # Gris oscuro
+    "MONTANTES CORTOS (NO PASANTE)": (9, QColor(192, 192, 192)), # Gris claro
+    
+    # HUECOS (Verdes/Azules oscuros)
+    "MONTANTES HUECOS (PASANTE)": (54, QColor(0, 128, 128)),   # Teal / Verde azulado
+    "MONTANTES HUECOS (NO PASANTE)": (44, QColor(34, 139, 34)), # Verde bosque
+    "MONTANTES SIMPLES HUECOS (PASANTE)": (54, QColor(0, 128, 128)),
+    "MONTANTES SIMPLES HUECOS (NO PASANTE)": (44, QColor(34, 139, 34)),
+    
+    # DINTELES (Rosas/Crimson)
+    "DINTEL (PASANTE)": (230, QColor(255, 0, 127)),            # Rosa fuerte
+    "DINTEL (NO PASANTE)": (6, QColor(255, 63, 255)),          # Magenta
+    
+    # ALFEIZARES (Cian/Sky)
+    "ALFEIZAR (PASANTE)": (64, QColor(135, 206, 235)),         # Cielo / Azul celeste
+    "ALFEIZAR (NO PASANTE)": (4, QColor(63, 255, 255)),        # Cian
+    
+    # CAPIALZADOS (Violeta / Púrpura)
+    "CAPIALZADO (PASANTE)": (190, QColor(127, 0, 255)),        # Púrpura
+    "CAPIALZADO (NO PASANTE)": (210, QColor(192, 0, 192)),     # Violeta
+    
+    # COTAS DE NIVEL (Oro/Magenta)
+    "LINEA COTA DE NIVEL (PASANTE)": (24, QColor(255, 191, 0)), # Ámbar / Oro
+    "LINEA COTA DE NIVEL (NO PASANTE)": (84, QColor(238, 130, 238)), # Violeta claro
+    
+    # PETOS (Marrones)
+    "LISTON PETOS": (14, QColor(150, 75, 0)),                  # Marrón
+    "TESTERO (PETOS)": (14, QColor(150, 75, 0)),
+}
+
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -51,6 +144,7 @@ class MainWindow(QMainWindow):
         self.merge_z_drop = 125.0
         self.merge_union_tol = 100.0
         self.merge_esquina_tol = 145.0
+        self.dxf_scale_factor = 1.0
         
         self.layer_list = QListWidget()
         self.layer_list.setMinimumWidth(320)
@@ -115,6 +209,10 @@ class MainWindow(QMainWindow):
 
         tools_menu = self.menuBar().addMenu("Herramientas")
 
+        preprocesar_cadwork_action = QAction("Preprocesar y clasificar (Cadwork)", self)
+        preprocesar_cadwork_action.triggered.connect(self.preprocesar_cadwork)
+        tools_menu.addAction(preprocesar_cadwork_action)
+
         # remove_layer_action = QAction("Eliminar capa", self)
         # remove_layer_action.triggered.connect(self.open_delete_layer_dialog)
         # tools_menu.addAction(remove_layer_action)
@@ -131,6 +229,10 @@ class MainWindow(QMainWindow):
         merge_action.triggered.connect(self.merge_durmientes_testeros)
         tools_menu.addAction(merge_action)
 
+        merge_contrapeados_action = QAction("Unir durmientes y testeros (Contrapeados)", self)
+        merge_contrapeados_action.triggered.connect(self.merge_durmientes_testeros_contrapeados)
+        tools_menu.addAction(merge_contrapeados_action)
+
         merge_union_action = QAction("Unir montantes union", self)
         merge_union_action.triggered.connect(self.merge_montantes_union)
         tools_menu.addAction(merge_union_action)
@@ -138,6 +240,10 @@ class MainWindow(QMainWindow):
         merge_corner_action = QAction("Unir montantes esquinas", self)
         merge_corner_action.triggered.connect(self.merge_montantes_esquinas)
         tools_menu.addAction(merge_corner_action)
+
+        fuse_cotas_action = QAction("Generar líneas de sobrecarga", self)
+        fuse_cotas_action.triggered.connect(self.generate_level_lines)
+        tools_menu.addAction(fuse_cotas_action)
 
 
 
@@ -147,9 +253,27 @@ class MainWindow(QMainWindow):
     def _build_layer_colors(self, layers: list[str]) -> dict[str, QColor]:
         colors: dict[str, QColor] = {}
         for i, layer in enumerate(sorted(layers)):
-            hue = int((i * 137.5) % 360)
-            colors[layer] = QColor.fromHsv(hue, 210, 230)
+            upper = layer.upper()
+            if upper in PREDEFINED_LAYER_MAP:
+                _, qcolor = PREDEFINED_LAYER_MAP[upper]
+                colors[layer] = qcolor
+            else:
+                _, qcolor = PREDEFINED_LAYERS_PALETTE[i % len(PREDEFINED_LAYERS_PALETTE)]
+                colors[layer] = qcolor
         return colors
+
+    def _get_layer_aci(self, layer_name: str, layers: list[str]) -> int:
+        upper = layer_name.upper()
+        if upper in PREDEFINED_LAYER_MAP:
+            aci, _ = PREDEFINED_LAYER_MAP[upper]
+            return aci
+        
+        sorted_layers = sorted(layers)
+        if layer_name in sorted_layers:
+            idx = sorted_layers.index(layer_name)
+            aci, _ = PREDEFINED_LAYERS_PALETTE[idx % len(PREDEFINED_LAYERS_PALETTE)]
+            return aci
+        return 7
 
     def _sanitize_layer_name(self, layer_name: str) -> str:
         sanitized = layer_name.translate(DXF_INVALID_LAYER_CHAR_REPLACEMENTS)
@@ -315,6 +439,67 @@ class MainWindow(QMainWindow):
         self._refresh_from_entity_geometries()
 
         ResultTextDialog(title="Resultado: unir durmientes y testeros", text=report, parent=self).exec()
+
+    def merge_durmientes_testeros_contrapeados(self) -> None:
+        from src.domain.structural_processor import StructuralProcessor
+        from src.ui.dialogs import ResultTextDialog
+
+        if not self.entity_geometries:
+            QMessageBox.information(
+                self,
+                "Unir durmientes y testeros (Contrapeados)",
+                "Carga primero un archivo DXF con geometria.",
+            )
+            return
+
+        z_drop, ok = QInputDialog.getDouble(
+            self,
+            "Unir durmientes y testeros (Contrapeados)",
+            "Distancia vertical maxima (Z):",
+            self.merge_z_drop,
+            0.001,
+            1000000.0,
+            3,
+        )
+        if not ok:
+            return
+        self.merge_z_drop = z_drop
+
+        processor = StructuralProcessor(self.entity_geometries)
+        success, report = processor.execute_merge_durmientes_testeros_contrapeados(z_drop)
+        
+        if not success:
+            QMessageBox.information(self, "Unir durmientes y testeros (Contrapeados)", report)
+            return
+
+        self.entity_geometries = processor.get_geometries()
+        self._refresh_from_entity_geometries()
+
+        ResultTextDialog(title="Resultado: unir durmientes y testeros (contrapeados)", text=report, parent=self).exec()
+
+    def generate_level_lines(self) -> None:
+        from src.domain.structural_processor import StructuralProcessor
+        from src.ui.dialogs import ResultTextDialog
+
+        if not self.entity_geometries:
+            QMessageBox.information(
+                self,
+                "Generar líneas de sobrecarga",
+                "Carga primero un archivo DXF con geometria.",
+            )
+            return
+
+        processor = StructuralProcessor(self.entity_geometries)
+        success, report = processor.generate_level_lines()
+        
+        if not success:
+            QMessageBox.information(self, "Generar líneas de sobrecarga", report)
+            return
+
+        self.entity_geometries = processor.get_geometries()
+        self._refresh_from_entity_geometries()
+
+        ResultTextDialog(title="Resultado: generar líneas de sobrecarga", text=report, parent=self).exec()
         
     def detect_montantes_durmientes(self) -> None:
         from src.domain.structural_processor import StructuralProcessor
@@ -372,6 +557,52 @@ class MainWindow(QMainWindow):
             parent=self,
         ).exec()
 
+    def preprocesar_cadwork(self) -> None:
+        from src.domain.structural_processor import StructuralProcessor
+        from src.ui.dialogs import PreprocesarCadworkDialog, ResultTextDialog
+
+        if not self.entity_geometries:
+            QMessageBox.information(
+                self,
+                "Preprocesar y clasificar (Cadwork)",
+                "Carga primero un archivo DXF con geometria.",
+            )
+            return
+
+        dialog = PreprocesarCadworkDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        tol_esquinas, tol_extremo, tol_xy, tol_z, tol_hueco, tol_cota, isolated_as_pasante = dialog.get_tolerances()
+
+        processor = StructuralProcessor(self.entity_geometries)
+        success, report = processor.execute_preprocesar_cadwork(
+            tol_corner_esquinas=tol_esquinas,
+            tol_extremo_fachada=tol_extremo,
+            tol_xy_proximity=tol_xy,
+            tol_z_plate=tol_z,
+            tol_hueco_xy=tol_hueco,
+            tol_cota_nivel=tol_cota,
+            default_isolated_as_pasante=isolated_as_pasante,
+        )
+
+        if not success:
+            QMessageBox.warning(
+                self,
+                "Preprocesar y clasificar (Cadwork)",
+                f"Error durante el preprocesamiento:\n\n{report}",
+            )
+            return
+
+        self.entity_geometries = processor.get_geometries()
+        self._refresh_from_entity_geometries()
+
+        ResultTextDialog(
+            title="Preprocesamiento Cadwork finalizado",
+            text=report,
+            parent=self,
+        ).exec()
+
     def save_dxf_file(self) -> None:
         from ezdxf import new
 
@@ -417,15 +648,17 @@ class MainWindow(QMainWindow):
             for entity in self.entity_geometries:
                 lname = effective_layer[entity.handle]
                 if lname not in existing_layers:
-                    doc.layers.new(name=lname)
+                    aci = self._get_layer_aci(entity.layer, layer_names)
+                    doc.layers.new(name=lname, dxfattribs={"color": aci})
                     existing_layers.add(lname)
 
+            scale_down = getattr(self, "dxf_scale_factor", 1.0)
             for entity in self.entity_geometries:
                 lname = effective_layer[entity.handle]
                 for x1, y1, z1, x2, y2, z2 in entity.segments:
                     msp.add_line(
-                        (float(x1), float(y1), float(z1)),
-                        (float(x2), float(y2), float(z2)),
+                        (float(x1 / scale_down), float(y1 / scale_down), float(z1 / scale_down)),
+                        (float(x2 / scale_down), float(y2 / scale_down), float(z2 / scale_down)),
                         dxfattribs={"layer": lname},
                     )
 
@@ -478,8 +711,40 @@ class MainWindow(QMainWindow):
 
             self.layer_counts = dict(layer_counts)
             self.current_file_path = file_path
-            self.entity_geometries = entity_geometries
-            segments = flatten_segments_for_viewer(entity_geometries)
+            
+            # Auto-detect unit scaling (meters vs millimeters)
+            max_coord = 0.0
+            for entity in entity_geometries:
+                for seg in entity.segments:
+                    max_coord = max(max_coord, abs(seg[0]), abs(seg[1]), abs(seg[2]), abs(seg[3]), abs(seg[4]), abs(seg[5]))
+            
+            self.dxf_scale_factor = 1.0
+            if max_coord < 50.0:
+                self.dxf_scale_factor = 1000.0  # meters -> millimeters
+            elif max_coord < 500.0:
+                self.dxf_scale_factor = 10.0    # centimeters -> millimeters
+                
+            if self.dxf_scale_factor != 1.0:
+                scaled_geometries = []
+                for entity in entity_geometries:
+                    scaled_segs = [
+                        (
+                            x1 * self.dxf_scale_factor,
+                            y1 * self.dxf_scale_factor,
+                            z1 * self.dxf_scale_factor,
+                            x2 * self.dxf_scale_factor,
+                            y2 * self.dxf_scale_factor,
+                            z2 * self.dxf_scale_factor
+                        )
+                        for x1, y1, z1, x2, y2, z2 in entity.segments
+                    ]
+                    entity.segments = scaled_segs
+                    scaled_geometries.append(entity)
+                self.entity_geometries = scaled_geometries
+            else:
+                self.entity_geometries = entity_geometries
+
+            segments = flatten_segments_for_viewer(self.entity_geometries)
             layer_colors = self._build_layer_colors(list(layer_counts.keys()))
             self._ensure_viewer().draw_segments(segments, layer_colors)
 
