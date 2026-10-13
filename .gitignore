@@ -4,3 +4,6 @@ build/
 dist/
 .idea/
 .claude/
+.agents/
+
+

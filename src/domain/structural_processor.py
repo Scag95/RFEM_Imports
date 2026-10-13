@@ -806,6 +806,106 @@ class StructuralProcessor:
         )
         return True, report_text
 
+    def execute_unir_dobles_montantes(self, distance_threshold: float = 90.0) -> tuple[bool, str]:
+        montantes_hueco = [
+            e
+            for e in self.entity_geometries
+            if "HUECO" in e.layer.upper() and "MONTANTE" in e.layer.upper()
+        ]
+        if not montantes_hueco:
+            return False, "No se encontraron elementos en capas de Montante Hueco."
+
+        montantes_simples = [
+            e
+            for e in self.entity_geometries
+            if "MONTANTE" in e.layer.upper()
+            and "SIMPLE" in e.layer.upper()
+            and "HUECO" not in e.layer.upper()
+            and "UNION" not in e.layer.upper()
+            and "ESQUINA" not in e.layer.upper()
+        ]
+        if not montantes_simples:
+            return False, "No se encontraron elementos en capas de Montante Simple para evaluar."
+
+        handles_to_remove: set[str] = set()
+        matched_hueco_count = 0
+
+        for h in montantes_hueco:
+            hx, hy = self._entity_xy_reference(h)
+            hz_min, hz_max = self._entity_z_limits(h)
+            h_matched = False
+
+            for s in montantes_simples:
+                if s.handle in handles_to_remove:
+                    continue
+
+                sz_min, sz_max = self._entity_z_limits(s)
+                if abs(hz_min - sz_min) > 300.0 and abs(hz_max - sz_max) > 300.0:
+                    continue
+
+                sx, sy = self._entity_xy_reference(s)
+                dist_xy = math.hypot(hx - sx, hy - sy)
+
+                if dist_xy <= distance_threshold:
+                    handles_to_remove.add(s.handle)
+                    h_matched = True
+
+            if h_matched:
+                matched_hueco_count += 1
+
+        if not handles_to_remove:
+            return False, f"No se encontraron montantes simples a menos de {distance_threshold} mm de ningún montante hueco."
+
+        self.entity_geometries = [
+            e for e in self.entity_geometries if e.handle not in handles_to_remove
+        ]
+
+        report_lines = [
+            "Unión de dobles montantes finalizada:",
+            f"  - Montantes huecos analizados: {len(montantes_hueco)}",
+            f"  - Montantes huecos con doble montante simple detectado: {matched_hueco_count}",
+            f"  - Montantes simples eliminados: {len(handles_to_remove)}",
+            f"  - Distancia límite usada: {distance_threshold} mm",
+        ]
+        return True, "\n".join(report_lines)
+
+    def execute_round_coordinates(self, decimals: int = 0) -> tuple[bool, str]:
+        if not self.entity_geometries:
+            return False, "No hay geometrías para redondear."
+
+        modified_entities = 0
+        total_segments = 0
+
+        for entity in self.entity_geometries:
+            new_segments = []
+            entity_modified = False
+            for x1, y1, z1, x2, y2, z2 in entity.segments:
+                total_segments += 1
+                if decimals == 0:
+                    rx1, ry1, rz1 = float(round(x1)), float(round(y1)), float(round(z1))
+                    rx2, ry2, rz2 = float(round(x2)), float(round(y2)), float(round(z2))
+                else:
+                    rx1, ry1, rz1 = round(x1, decimals), round(y1, decimals), round(z1, decimals)
+                    rx2, ry2, rz2 = round(x2, decimals), round(y2, decimals), round(z2, decimals)
+
+                if (rx1, ry1, rz1, rx2, ry2, rz2) != (x1, y1, z1, x2, y2, z2):
+                    entity_modified = True
+
+                new_segments.append((rx1, ry1, rz1, rx2, ry2, rz2))
+
+            entity.segments = new_segments
+            if entity_modified:
+                modified_entities += 1
+
+        report_lines = [
+            "Redondeo de coordenadas finalizado:",
+            f"  - Total de entidades procesadas: {len(self.entity_geometries)}",
+            f"  - Entidades modificadas: {modified_entities}",
+            f"  - Total de segmentos redondeados: {total_segments}",
+            f"  - Decimales aplicados: {decimals}",
+        ]
+        return True, "\n".join(report_lines)
+
     def execute_merge_montantes_esquinas(self, tol_union_horizontal: float) -> tuple[bool, str]:
         tol_z_equal = 1.0
         tol_conn = 1.0

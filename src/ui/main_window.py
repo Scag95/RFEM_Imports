@@ -144,6 +144,7 @@ class MainWindow(QMainWindow):
         self.merge_z_drop = 125.0
         self.merge_union_tol = 100.0
         self.merge_esquina_tol = 145.0
+        self.merge_dobles_montantes_tol = 90.0
         self.dxf_scale_factor = 1.0
         
         self.layer_list = QListWidget()
@@ -213,6 +214,10 @@ class MainWindow(QMainWindow):
         preprocesar_cadwork_action.triggered.connect(self.preprocesar_cadwork)
         tools_menu.addAction(preprocesar_cadwork_action)
 
+        unir_dobles_action = QAction("Unir dobles montantes", self)
+        unir_dobles_action.triggered.connect(self.unir_dobles_montantes)
+        tools_menu.addAction(unir_dobles_action)
+
         # remove_layer_action = QAction("Eliminar capa", self)
         # remove_layer_action.triggered.connect(self.open_delete_layer_dialog)
         # tools_menu.addAction(remove_layer_action)
@@ -244,6 +249,10 @@ class MainWindow(QMainWindow):
         fuse_cotas_action = QAction("Generar líneas de sobrecarga", self)
         fuse_cotas_action.triggered.connect(self.generate_level_lines)
         tools_menu.addAction(fuse_cotas_action)
+
+        round_coords_action = QAction("Redondear coordenadas", self)
+        round_coords_action.triggered.connect(self.round_coordinates)
+        tools_menu.addAction(round_coords_action)
 
 
 
@@ -365,6 +374,79 @@ class MainWindow(QMainWindow):
         self._refresh_from_entity_geometries()
 
         ResultTextDialog(title="Resultado: unir montantes union", text=report, parent=self).exec()
+
+    def unir_dobles_montantes(self) -> None:
+        from src.domain.structural_processor import StructuralProcessor
+        from src.ui.dialogs import ResultTextDialog
+
+        if not self.entity_geometries:
+            QMessageBox.information(
+                self,
+                "Unir dobles montantes",
+                "Carga primero un archivo DXF con geometria.",
+            )
+            return
+
+        distance_threshold, ok = QInputDialog.getDouble(
+            self,
+            "Unir dobles montantes",
+            "Distancia máxima al montante hueco (mm):",
+            self.merge_dobles_montantes_tol,
+            0.001,
+            10000.0,
+            2,
+        )
+        if not ok:
+            return
+        self.merge_dobles_montantes_tol = distance_threshold
+
+        processor = StructuralProcessor(self.entity_geometries)
+        success, report = processor.execute_unir_dobles_montantes(distance_threshold)
+
+        if not success:
+            QMessageBox.information(self, "Unir dobles montantes", report)
+            return
+
+        self.entity_geometries = processor.get_geometries()
+        self._refresh_from_entity_geometries()
+
+        ResultTextDialog(title="Resultado: unir dobles montantes", text=report, parent=self).exec()
+
+    def round_coordinates(self) -> None:
+        from src.domain.structural_processor import StructuralProcessor
+        from src.ui.dialogs import ResultTextDialog
+
+        if not self.entity_geometries:
+            QMessageBox.information(
+                self,
+                "Redondear coordenadas",
+                "Carga primero un archivo DXF con geometria.",
+            )
+            return
+
+        decimals, ok = QInputDialog.getInt(
+            self,
+            "Redondear coordenadas",
+            "Número de decimales:",
+            0,
+            0,
+            6,
+            1,
+        )
+        if not ok:
+            return
+
+        processor = StructuralProcessor(self.entity_geometries)
+        success, report = processor.execute_round_coordinates(decimals)
+
+        if not success:
+            QMessageBox.information(self, "Redondear coordenadas", report)
+            return
+
+        self.entity_geometries = processor.get_geometries()
+        self._refresh_from_entity_geometries()
+
+        ResultTextDialog(title="Resultado: redondear coordenadas", text=report, parent=self).exec()
 
     def merge_montantes_esquinas(self) -> None:
         from src.domain.structural_processor import StructuralProcessor
@@ -615,14 +697,19 @@ class MainWindow(QMainWindow):
             return
 
         default_name = "resultado_uniones.dxf"
+        default_dir = os.path.dirname(self.current_file_path) if self.current_file_path else ""
         if self.current_file_path.lower().endswith(".dxf"):
             base = os.path.splitext(os.path.basename(self.current_file_path))[0]
-            default_name = f"{base}_editado.dxf"
+            filename = f"{base}_editado.dxf"
+        else:
+            filename = default_name
+
+        initial_path = os.path.join(default_dir, filename) if default_dir else filename
 
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Guardar archivo DXF",
-            default_name,
+            initial_path,
             "DXF Files (*.dxf);;All Files (*)",
         )
         if not file_path:
@@ -665,6 +752,7 @@ class MainWindow(QMainWindow):
             doc.saveas(file_path)
 
             # Mutar en memoria solo tras escritura exitosa
+            self.current_file_path = file_path
             if adjusted_names:
                 for entity in self.entity_geometries:
                     entity.layer = effective_layer[entity.handle]
@@ -684,10 +772,12 @@ class MainWindow(QMainWindow):
     def load_dxf_file(self) -> None:
         from ezdxf import readfile
 
+        start_dir = os.path.dirname(self.current_file_path) if self.current_file_path else ""
+
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Seleccionar archivo DXF",
-            "",
+            start_dir,
             "DXF Files (*.dxf);;All Files (*)",
         )
         if not file_path:
