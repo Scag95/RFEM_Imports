@@ -1312,6 +1312,7 @@ class StructuralProcessor:
         tol_hueco_xy: float = 100.0,
         tol_cota_nivel: float = 1125.0,
         default_isolated_as_pasante: bool = True,
+        max_panel_height: float = 10000.0,
     ) -> tuple[bool, str]:
         # Collect elements from self.entity_geometries
         plates = []
@@ -1319,6 +1320,7 @@ class StructuralProcessor:
         dinteles = []
         alfeizares = []
         capialzados = []
+        cadenetas = []
 
         for entity in self.entity_geometries:
             if not entity.segments:
@@ -1342,6 +1344,8 @@ class StructuralProcessor:
                 alfeizares.append(data)
             elif "CAPIALZADO" in layer_upper:
                 capialzados.append(data)
+            elif "CADENETA" in layer_upper:
+                cadenetas.append(data)
 
         if not plates:
             return False, "No se encontraron elementos en capas TESTERO o DURMIENTE."
@@ -1376,9 +1380,9 @@ class StructuralProcessor:
                 d_end_xy = (d['end'][0], d['end'][1])
                 d_z = min(d['start'][2], d['end'][2])
                 
-                # Height difference check (1000 to 4000 mm to support shorter panels under stairs)
+                # Height difference check (1000 to max_panel_height mm to support 8m double-height panels)
                 z_height = t_z - d_z
-                if not (1000.0 <= z_height <= 4000.0):
+                if not (1000.0 <= z_height <= max_panel_height):
                     continue
                     
                 # Proximity check in XY
@@ -1439,6 +1443,28 @@ class StructuralProcessor:
                 panel_montantes[best_panel_idx].append(m)
             else:
                 unassigned_montantes.append(m)
+
+        # Associate cadenetas to panels
+        panel_cadenetas = {i: [] for i in range(len(panels))}
+        unassigned_cadenetas = []
+        for c in cadenetas:
+            cmx = (c['start'][0] + c['end'][0]) / 2.0
+            cmy = (c['start'][1] + c['end'][1]) / 2.0
+            c_z = c['start'][2]
+            best_panel_idx = -1
+            min_proj_dist = float('inf')
+            for idx, panel in enumerate(panels):
+                if not (panel['z_bottom'] - 50.0 <= c_z <= panel['z_top'] + 50.0):
+                    continue
+                t = panel['testero']
+                dist = point_to_segment_distance_xy(cmx, cmy, t['start'][0], t['start'][1], t['end'][0], t['end'][1])
+                if dist < min_proj_dist and dist <= tol_xy_proximity:
+                    min_proj_dist = dist
+                    best_panel_idx = idx
+            if best_panel_idx != -1:
+                panel_cadenetas[best_panel_idx].append(c)
+            else:
+                unassigned_cadenetas.append(c)
 
         # 2. Determine classifications (Pasante / No Pasante) using TESTERO separation
         panel_classes = {} # panel_id -> "Pasante" or "No Pasante"
@@ -1518,6 +1544,68 @@ class StructuralProcessor:
             panel['dinteles'] = panel_dinteles
             panel['alfeizares'] = panel_alfeizares
             panel['capialzados'] = panel_capialzados
+            panel['cadenetas'] = panel_cadenetas[idx]
+
+            # Snap cadenetas to containing montantes (BEFORE short montantes Z are modified)
+            for cad in panel['cadenetas']:
+                cs = [cad['start'][0], cad['start'][1], cad['start'][2]]
+                ce = [cad['end'][0], cad['end'][1], cad['end'][2]]
+                cz = cs[2]
+                
+                cands = []
+                for m in associated:
+                    mz_min, mz_max = min(m['start'][2], m['end'][2]), max(m['start'][2], m['end'][2])
+                    if mz_min - 50.0 <= cz <= mz_max + 50.0:
+                        cands.append(((m['start'][0] + m['end'][0]) / 2.0, (m['start'][1] + m['end'][1]) / 2.0, m))
+                        
+                best_s, min_ds = None, float('inf')
+                best_e, min_de = None, float('inf')
+                for mx, my, m in cands:
+                    ds = math.hypot(mx - cs[0], my - cs[1])
+                    de = math.hypot(mx - ce[0], my - ce[1])
+                    if ds < min_ds:
+                        min_ds = ds
+                        best_s = (mx, my, m)
+                    if de < min_de:
+                        min_de = de
+                        best_e = (mx, my, m)
+                        
+                # If either endpoint didn't find a close stud in this panel, search all montantes
+                if min_ds > tol_xy_proximity * 2 or min_de > tol_xy_proximity * 2 or (best_s and best_e and best_s[2]['handle'] == best_e[2]['handle']):
+                    for m in montantes:
+                        if m in associated:
+                            continue
+                        mz_min, mz_max = min(m['start'][2], m['end'][2]), max(m['start'][2], m['end'][2])
+                        if mz_min - 50.0 <= cz <= mz_max + 50.0:
+                            mx = (m['start'][0] + m['end'][0]) / 2.0
+                            my = (m['start'][1] + m['end'][1]) / 2.0
+                            ds = math.hypot(mx - cs[0], my - cs[1])
+                            de = math.hypot(mx - ce[0], my - ce[1])
+                            if ds < min_ds:
+                                min_ds = ds
+                                best_s = (mx, my, m)
+                            if de < min_de:
+                                min_de = de
+                                best_e = (mx, my, m)
+                                
+                if best_s and best_e and best_s[2]['handle'] != best_e[2]['handle'] and min_ds <= tol_xy_proximity * 2 and min_de <= tol_xy_proximity * 2:
+                    cad['start'][0], cad['start'][1] = best_s[0], best_s[1]
+                    cad['end'][0], cad['end'][1] = best_e[0], best_e[1]
+                else:
+                    cmx = (cs[0] + ce[0]) / 2.0
+                    cmy = (cs[1] + ce[1]) / 2.0
+                    near_center = []
+                    for mx, my, m in cands:
+                        d = math.hypot(mx - cmx, my - cmy)
+                        if d <= tol_xy_proximity * 2:
+                            near_center.append((d, mx, my, m))
+                    near_center.sort()
+                    if len(near_center) >= 2:
+                        cad['start'][0], cad['start'][1] = near_center[0][1], near_center[0][2]
+                        cad['end'][0], cad['end'][1] = near_center[1][1], near_center[1][2]
+                        
+                cad['entity'].layer = f"CADENETA{suffix}"
+                cad['entity'].segments = [(cad['start'][0], cad['start'][1], cad['start'][2], cad['end'][0], cad['end'][1], cad['end'][2])]
 
             full_height = []
             short_montantes = []
@@ -1749,25 +1837,31 @@ class StructuralProcessor:
                 if m_z_mid < (z_bottom + z_top) / 2.0:
                     m['start'][2] = z_bottom
                     best_a = None
+                    min_dz = float('inf')
                     for a in panel_alfeizares:
                         dist = point_to_segment_distance_xy(mx, my, a['start'][0], a['start'][1], a['end'][0], a['end'][1])
                         if dist <= tol_xy_proximity:
-                            best_a = a
-                            break
-                    if best_a:
+                            dz = abs(a['start'][2] - m['end'][2])
+                            if dz < min_dz:
+                                min_dz = dz
+                                best_a = a
+                    if best_a and min_dz <= 500.0:
                         m['end'][2] = best_a['start'][2]
                 else:
                     m['end'][2] = z_top
                     best_d = None
+                    min_dz = float('inf')
                     for d in panel_dinteles:
                         dist = point_to_segment_distance_xy(mx, my, d['start'][0], d['start'][1], d['end'][0], d['end'][1])
                         if dist <= tol_xy_proximity:
                             min_x = min(d['start'][0], d['end'][0])
                             max_x = max(d['start'][0], d['end'][0])
                             if min_x - 10 <= mx <= max_x + 10:
-                                best_d = d
-                                break
-                    if best_d:
+                                dz = abs(d['start'][2] - m['start'][2])
+                                if dz < min_dz:
+                                    min_dz = dz
+                                    best_d = d
+                    if best_d and min_dz <= 500.0:
                         m['start'][2] = best_d['start'][2]
 
         # STEP 1.5: Facade Ends Demoted to MONTANTES SIMPLES (isolated union studs, tol = 200mm)
@@ -1877,7 +1971,7 @@ class StructuralProcessor:
                     new_geometries.append(m['entity'])
                     appended_handles.add(m['handle'])
 
-            # Processed dinteles, alfeizares and capialzados of this panel
+            # Processed dinteles, alfeizares, capialzados and cadenetas of this panel
             for dintel_data in panel['dinteles']:
                 if dintel_data['handle'] not in appended_handles:
                     new_geometries.append(dintel_data['entity'])
@@ -1890,6 +1984,10 @@ class StructuralProcessor:
                 if capialzado_data['handle'] not in appended_handles:
                     new_geometries.append(capialzado_data['entity'])
                     appended_handles.add(capialzado_data['handle'])
+            for cadeneta_data in panel.get('cadenetas', []):
+                if cadeneta_data['handle'] not in appended_handles:
+                    new_geometries.append(cadeneta_data['entity'])
+                    appended_handles.add(cadeneta_data['handle'])
 
         # Unassigned montantes
         for m in unassigned_montantes:
@@ -1923,6 +2021,22 @@ class StructuralProcessor:
                 new_geometries.append(c['entity'])
                 appended_handles.add(c['handle'])
 
+        # Fallback for unassigned cadenetas
+        for c in unassigned_cadenetas:
+            if c['handle'] not in appended_handles:
+                c['entity'].layer = "CADENETA (No Pasante)"
+                c['entity'].segments = [(c['start'][0], c['start'][1], c['start'][2], c['end'][0], c['end'][1], c['end'][2])]
+                new_geometries.append(c['entity'])
+                appended_handles.add(c['handle'])
+
+        # Fallback for unmatched plates (prevent plate loss)
+        for p in plates:
+            if p['handle'] not in appended_handles:
+                p['entity'].layer = f"{p['orig_layer']} (No Pasante)"
+                p['entity'].segments = [(p['start'][0], p['start'][1], p['start'][2], p['end'][0], p['end'][1], p['end'][2])]
+                new_geometries.append(p['entity'])
+                appended_handles.add(p['handle'])
+
         # Non-processed entities
         processed_handles = set()
         for p in plates:
@@ -1934,6 +2048,8 @@ class StructuralProcessor:
         for a in alfeizares:
             processed_handles.add(a['handle'])
         for c in capialzados:
+            processed_handles.add(c['handle'])
+        for c in cadenetas:
             processed_handles.add(c['handle'])
             
         for entity in self.entity_geometries:
@@ -1951,6 +2067,7 @@ class StructuralProcessor:
             f"  - Dinteles procesados: {len(dinteles)}",
             f"  - Alfeizares procesados: {len(alfeizares)}",
             f"  - Capialzados procesados: {len(capialzados)}",
+            f"  - Cadenetas procesadas: {len(cadenetas)}",
             f"  - Montantes desclasificados por extremo libre (aislamiento): {demoted_count}",
             f"  - Montantes promovidos a esquina: {corner_count}",
         ]

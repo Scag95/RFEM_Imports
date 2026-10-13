@@ -125,6 +125,11 @@ PREDEFINED_LAYER_MAP: dict[str, tuple[int, QColor]] = {
     "LINEA COTA DE NIVEL (PASANTE)": (24, QColor(255, 191, 0)), # Ámbar / Oro
     "LINEA COTA DE NIVEL (NO PASANTE)": (84, QColor(238, 130, 238)), # Violeta claro
     
+    # CADENETAS (Ámbar / Naranja / Oro)
+    "CADENETA (PASANTE)": (24, QColor(255, 191, 0)),           # Ámbar
+    "CADENETA (NO PASANTE)": (184, QColor(230, 126, 34)),      # Naranja zanahoria
+    "CADENETA": (24, QColor(255, 191, 0)),
+    
     # PETOS (Marrones)
     "LISTON PETOS": (14, QColor(150, 75, 0)),                  # Marrón
     "TESTERO (PETOS)": (14, QColor(150, 75, 0)),
@@ -655,7 +660,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
-        tol_esquinas, tol_extremo, tol_xy, tol_z, tol_hueco, tol_cota, isolated_as_pasante = dialog.get_tolerances()
+        tol_esquinas, tol_extremo, tol_xy, tol_z, tol_hueco, tol_cota, max_panel_height, isolated_as_pasante = dialog.get_tolerances()
 
         processor = StructuralProcessor(self.entity_geometries)
         success, report = processor.execute_preprocesar_cadwork(
@@ -666,6 +671,7 @@ class MainWindow(QMainWindow):
             tol_hueco_xy=tol_hueco,
             tol_cota_nivel=tol_cota,
             default_isolated_as_pasante=isolated_as_pasante,
+            max_panel_height=max_panel_height,
         )
 
         if not success:

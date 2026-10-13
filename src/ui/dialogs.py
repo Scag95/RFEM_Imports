@@ -274,8 +274,21 @@ class PreprocesarCadworkDialog(QDialog):
         
         tol_cota_help = QLabel("Distancia vertical en Z por encima de la base del durmiente para trazar la línea de cota de nivel continua (ej. 1125 mm).")
         tol_cota_help.setWordWrap(True)
-        tol_cota_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 12px;")
+        tol_cota_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 8px;")
         form.addRow("", tol_cota_help)
+
+        # Max Panel Height (Z)
+        self.max_panel_height_spin = QDoubleSpinBox(self)
+        self.max_panel_height_spin.setRange(1000.0, 30000.0)
+        self.max_panel_height_spin.setSingleStep(500.0)
+        self.max_panel_height_spin.setValue(10000.0)
+        self.max_panel_height_spin.setSuffix(" mm")
+        form.addRow("Altura máxima de panel (Z):", self.max_panel_height_spin)
+
+        max_h_help = QLabel("Límite superior de altura para emparejar testeros con durmientes (permite paneles de doble altura de 8 m).")
+        max_h_help.setWordWrap(True)
+        max_h_help.setStyleSheet("color: #666666; font-size: 10px; font-style: italic; margin-bottom: 12px;")
+        form.addRow("", max_h_help)
 
         # Isolated Panels Checkbox
         self.isolated_as_pasante_check = QCheckBox("Considerar paneles aislados como Pasantes", self)
@@ -301,7 +314,7 @@ class PreprocesarCadworkDialog(QDialog):
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
 
-    def get_tolerances(self) -> tuple[float, float, float, float, float, float, bool]:
+    def get_tolerances(self) -> tuple[float, float, float, float, float, float, float, bool]:
         return (
             self.tol_esquinas_spin.value(),
             self.tol_extremo_spin.value(),
@@ -309,5 +322,6 @@ class PreprocesarCadworkDialog(QDialog):
             self.tol_z_spin.value(),
             self.tol_hueco_spin.value(),
             self.tol_cota_spin.value(),
+            self.max_panel_height_spin.value(),
             self.isolated_as_pasante_check.isChecked()
         )
