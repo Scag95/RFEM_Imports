@@ -29,6 +29,17 @@ def project_point_onto_line_2d(px: float, py: float, x1: float, y1: float, x2: f
     t = ((px - x1) * vx + (py - y1) * vy) / segment_len_sq
     return (x1 + t * vx, y1 + t * vy)
 
+def extract_panel_id_from_layer(layer: str) -> str:
+    """Extrae el identificador de panel de una capa si existe (ej. 'MONTANTE_T101' -> 'T101')."""
+    if "_" in layer:
+        prefix, rest = layer.split("_", 1)
+        if "(" in rest:
+            rest = rest.split("(", 1)[0]
+        pid = rest.strip()
+        if pid:
+            return pid
+    return ""
+
 class StructuralProcessor:
     def __init__(self, geometries: list[EntityGeometry]):
         self.entity_geometries = geometries
@@ -1326,12 +1337,14 @@ class StructuralProcessor:
             if not entity.segments:
                 continue
             x1, y1, z1, x2, y2, z2 = entity.segments[0]
+            pid = extract_panel_id_from_layer(entity.layer)
             data = {
                 'entity': entity,
                 'handle': entity.handle,
                 'start': [x1, y1, z1],
                 'end': [x2, y2, z2],
-                'orig_layer': entity.layer
+                'orig_layer': entity.layer,
+                'panel_id': pid,
             }
             layer_upper = entity.layer.upper()
             if "TESTERO" in layer_upper or "DURMIENTE" in layer_upper:
@@ -1368,12 +1381,16 @@ class StructuralProcessor:
             t_start_xy = (t['start'][0], t['start'][1])
             t_end_xy = (t['end'][0], t['end'][1])
             t_z = max(t['start'][2], t['end'][2])
+            t_pid = t.get('panel_id', '')
             
             best_d = None
             min_score = (True, float('inf'), float('inf'))
             
             for d in durmientes:
                 if d['handle'] in used_plates:
+                    continue
+                d_pid = d.get('panel_id', '')
+                if t_pid and d_pid and t_pid != d_pid:
                     continue
                     
                 d_start_xy = (d['start'][0], d['start'][1])
@@ -1403,8 +1420,10 @@ class StructuralProcessor:
             if best_d:
                 used_plates.add(t['handle'])
                 used_plates.add(best_d['handle'])
+                p_id_val = t_pid or best_d.get('panel_id', '')
                 panels.append({
                     'id': len(panels),
+                    'panel_id': p_id_val,
                     'testero': t,
                     'durmiente': best_d,
                     'start_xy': t_start_xy,
@@ -1426,11 +1445,15 @@ class StructuralProcessor:
             mx = (m['start'][0] + m['end'][0]) / 2.0
             my = (m['start'][1] + m['end'][1]) / 2.0
             m_z_mid = (m['start'][2] + m['end'][2]) / 2.0
+            m_pid = m.get('panel_id', '')
             
             best_panel_idx = -1
             min_proj_dist = float('inf')
             
             for idx, panel in enumerate(panels):
+                if m_pid and panel.get('panel_id'):
+                    if m_pid != panel.get('panel_id'):
+                        continue
                 if not (panel['z_bottom'] - 200.0 <= m_z_mid <= panel['z_top'] + 200.0):
                     continue
                 t = panel['testero']
@@ -1451,9 +1474,13 @@ class StructuralProcessor:
             cmx = (c['start'][0] + c['end'][0]) / 2.0
             cmy = (c['start'][1] + c['end'][1]) / 2.0
             c_z = c['start'][2]
+            c_pid = c.get('panel_id', '')
             best_panel_idx = -1
             min_proj_dist = float('inf')
             for idx, panel in enumerate(panels):
+                if c_pid and panel.get('panel_id'):
+                    if c_pid != panel.get('panel_id'):
+                        continue
                 if not (panel['z_bottom'] - 50.0 <= c_z <= panel['z_top'] + 50.0):
                     continue
                 t = panel['testero']
@@ -1525,10 +1552,20 @@ class StructuralProcessor:
             z_top = panel['z_top']
             z_bottom = panel['z_bottom']
             associated = panel_montantes[idx]
+            p_class = panel_classes[idx]
+            suffix = f" ({p_class})"
+            p_pid = panel.get('panel_id', '')
+            pid_suffix = f"_{p_pid}" if p_pid else ""
             
             # STRICT Z CONSTRAINT: Dinteles, alfeizares and capialzados must lie within the panel Z range!
-            panel_dinteles = [d for d in dinteles if (z_bottom - 50.0 <= d['start'][2] <= z_top + 50.0) and point_to_segment_distance_xy((d['start'][0]+d['end'][0])/2.0, (d['start'][1]+d['end'][1])/2.0, t_data['start'][0], t_data['start'][1], t_data['end'][0], t_data['end'][1]) <= tol_xy_proximity]
-            panel_alfeizares = [a for a in alfeizares if (z_bottom - 50.0 <= a['start'][2] <= z_top + 50.0) and point_to_segment_distance_xy((a['start'][0]+a['end'][0])/2.0, (a['start'][1]+a['end'][1])/2.0, t_data['start'][0], t_data['start'][1], t_data['end'][0], t_data['end'][1]) <= tol_xy_proximity]
+            panel_dinteles = [d for d in dinteles if (z_bottom - 50.0 <= d['start'][2] <= z_top + 50.0) and (
+                (p_pid and d.get('panel_id') == p_pid) or
+                (not d.get('panel_id') and point_to_segment_distance_xy((d['start'][0]+d['end'][0])/2.0, (d['start'][1]+d['end'][1])/2.0, t_data['start'][0], t_data['start'][1], t_data['end'][0], t_data['end'][1]) <= tol_xy_proximity)
+            )]
+            panel_alfeizares = [a for a in alfeizares if (z_bottom - 50.0 <= a['start'][2] <= z_top + 50.0) and (
+                (p_pid and a.get('panel_id') == p_pid) or
+                (not a.get('panel_id') and point_to_segment_distance_xy((a['start'][0]+a['end'][0])/2.0, (a['start'][1]+a['end'][1])/2.0, t_data['start'][0], t_data['start'][1], t_data['end'][0], t_data['end'][1]) <= tol_xy_proximity)
+            )]
             
             # Capialzados can be out-of-plane, so check perpendicular distance to panel line
             panel_capialzados = []
@@ -1536,10 +1573,13 @@ class StructuralProcessor:
                 c_z_min = min(c['start'][2], c['end'][2])
                 c_z_max = max(c['start'][2], c['end'][2])
                 if (z_bottom - 50.0 <= c_z_min <= z_top + 50.0) or (z_bottom - 50.0 <= c_z_max <= z_top + 50.0):
-                    cmx, cmy = (c['start'][0] + c['end'][0]) / 2.0, (c['start'][1] + c['end'][1]) / 2.0
-                    perp_dist = point_to_line_distance_2d(cmx, cmy, t_data['start'][0], t_data['start'][1], t_data['end'][0], t_data['end'][1])
-                    if perp_dist <= tol_xy_proximity * 2.0:
+                    if p_pid and c.get('panel_id') == p_pid:
                         panel_capialzados.append(c)
+                    elif not c.get('panel_id'):
+                        cmx, cmy = (c['start'][0] + c['end'][0]) / 2.0, (c['start'][1] + c['end'][1]) / 2.0
+                        perp_dist = point_to_line_distance_2d(cmx, cmy, t_data['start'][0], t_data['start'][1], t_data['end'][0], t_data['end'][1])
+                        if perp_dist <= tol_xy_proximity * 2.0:
+                            panel_capialzados.append(c)
 
             panel['dinteles'] = panel_dinteles
             panel['alfeizares'] = panel_alfeizares
@@ -1604,7 +1644,7 @@ class StructuralProcessor:
                         cad['start'][0], cad['start'][1] = near_center[0][1], near_center[0][2]
                         cad['end'][0], cad['end'][1] = near_center[1][1], near_center[1][2]
                         
-                cad['entity'].layer = f"CADENETA{suffix}"
+                cad['entity'].layer = f"CADENETA{pid_suffix}{suffix}"
                 cad['entity'].segments = [(cad['start'][0], cad['start'][1], cad['start'][2], cad['end'][0], cad['end'][1], cad['end'][2])]
 
             full_height = []
@@ -1712,10 +1752,6 @@ class StructuralProcessor:
                 panel['start_xy_trimmed'] = left_xy
                 panel['end_xy_trimmed'] = right_xy
 
-            # Get the suffix (Pasante / No Pasante) for this panel
-            p_class = panel_classes[idx]
-            suffix = f" ({p_class})"
-
             # Extend dinteles and alfeizares and save with correct layer name suffix
             for d in panel_dinteles:
                 d_start_xy = (d['start'][0], d['start'][1])
@@ -1749,7 +1785,7 @@ class StructuralProcessor:
                              (best_end_m['start'][1] + best_end_m['end'][1]) / 2.0)
                     d['end'][0], d['end'][1] = hm_xy[0], hm_xy[1]
                 
-                d['entity'].layer = f"DINTEL{suffix}"
+                d['entity'].layer = f"DINTEL{pid_suffix}{suffix}"
                 d['entity'].segments = [(d['start'][0], d['start'][1], d['start'][2], d['end'][0], d['end'][1], d['end'][2])]
 
             for a in panel_alfeizares:
@@ -1784,7 +1820,7 @@ class StructuralProcessor:
                              (best_end_m['start'][1] + best_end_m['end'][1]) / 2.0)
                     a['end'][0], a['end'][1] = hm_xy[0], hm_xy[1]
                 
-                a['entity'].layer = f"ALFEIZAR{suffix}"
+                a['entity'].layer = f"ALFEIZAR{pid_suffix}{suffix}"
                 a['entity'].segments = [(a['start'][0], a['start'][1], a['start'][2], a['end'][0], a['end'][1], a['end'][2])]
 
             for c in panel_capialzados:
@@ -1819,7 +1855,7 @@ class StructuralProcessor:
                              (best_end_m['start'][1] + best_end_m['end'][1]) / 2.0)
                     c['end'][0], c['end'][1] = hm_xy[0], hm_xy[1]
                 
-                c['entity'].layer = f"CAPIALZADO{suffix}"
+                c['entity'].layer = f"CAPIALZADO{pid_suffix}{suffix}"
                 c['entity'].segments = [(c['start'][0], c['start'][1], c['start'][2], c['end'][0], c['end'][1], c['end'][2])]
 
             # Snapped full-height montantes vertically
@@ -1947,16 +1983,18 @@ class StructuralProcessor:
         for idx, panel in enumerate(panels):
             p_class = panel_classes[idx]
             suffix = f" ({p_class})"
+            p_pid = panel.get('panel_id', '')
+            pid_suffix = f"_{p_pid}" if p_pid else ""
             
             t = panel['testero']
-            t['entity'].layer = f"TESTERO{suffix}"
+            t['entity'].layer = f"TESTERO{pid_suffix}{suffix}"
             t['entity'].segments = [(t['start'][0], t['start'][1], t['start'][2], t['end'][0], t['end'][1], t['end'][2])]
             if t['handle'] not in appended_handles:
                 new_geometries.append(t['entity'])
                 appended_handles.add(t['handle'])
             
             d = panel['durmiente']
-            d['entity'].layer = f"DURMIENTE{suffix}"
+            d['entity'].layer = f"DURMIENTE{pid_suffix}{suffix}"
             d['entity'].segments = [(d['start'][0], d['start'][1], d['start'][2], d['end'][0], d['end'][1], d['end'][2])]
             if d['handle'] not in appended_handles:
                 new_geometries.append(d['entity'])
@@ -1965,7 +2003,7 @@ class StructuralProcessor:
             # Processed montantes
             for m in panel_montantes[idx]:
                 layer_base = classified.get(m['handle'], "MONTANTES SIMPLES")
-                m['entity'].layer = f"{layer_base}{suffix}"
+                m['entity'].layer = f"{layer_base}{pid_suffix}{suffix}"
                 m['entity'].segments = [(m['start'][0], m['start'][1], m['start'][2], m['end'][0], m['end'][1], m['end'][2])]
                 if m['handle'] not in appended_handles:
                     new_geometries.append(m['entity'])
@@ -1991,7 +2029,9 @@ class StructuralProcessor:
 
         # Unassigned montantes
         for m in unassigned_montantes:
-            m['entity'].layer = "MONTANTES CORTOS (No Pasante)"
+            m_pid = m.get('panel_id', '')
+            pid_suf = f"_{m_pid}" if m_pid else ""
+            m['entity'].layer = f"MONTANTES CORTOS{pid_suf} (No Pasante)"
             m['entity'].segments = [(m['start'][0], m['start'][1], m['start'][2], m['end'][0], m['end'][1], m['end'][2])]
             if m['handle'] not in appended_handles:
                 new_geometries.append(m['entity'])
@@ -2000,7 +2040,9 @@ class StructuralProcessor:
         # Fallback for unmatched dinteles
         for d in dinteles:
             if d['handle'] not in appended_handles:
-                d['entity'].layer = "DINTEL (No Pasante)"
+                d_pid = d.get('panel_id', '')
+                pid_suf = f"_{d_pid}" if d_pid else ""
+                d['entity'].layer = f"DINTEL{pid_suf} (No Pasante)"
                 d['entity'].segments = [(d['start'][0], d['start'][1], d['start'][2], d['end'][0], d['end'][1], d['end'][2])]
                 new_geometries.append(d['entity'])
                 appended_handles.add(d['handle'])
@@ -2008,7 +2050,9 @@ class StructuralProcessor:
         # Fallback for unmatched alfeizares
         for a in alfeizares:
             if a['handle'] not in appended_handles:
-                a['entity'].layer = "ALFEIZAR (No Pasante)"
+                a_pid = a.get('panel_id', '')
+                pid_suf = f"_{a_pid}" if a_pid else ""
+                a['entity'].layer = f"ALFEIZAR{pid_suf} (No Pasante)"
                 a['entity'].segments = [(a['start'][0], a['start'][1], a['start'][2], a['end'][0], a['end'][1], a['end'][2])]
                 new_geometries.append(a['entity'])
                 appended_handles.add(a['handle'])
@@ -2016,7 +2060,9 @@ class StructuralProcessor:
         # Fallback for unmatched capialzados
         for c in capialzados:
             if c['handle'] not in appended_handles:
-                c['entity'].layer = "CAPIALZADO (No Pasante)"
+                c_pid = c.get('panel_id', '')
+                pid_suf = f"_{c_pid}" if c_pid else ""
+                c['entity'].layer = f"CAPIALZADO{pid_suf} (No Pasante)"
                 c['entity'].segments = [(c['start'][0], c['start'][1], c['start'][2], c['end'][0], c['end'][1], c['end'][2])]
                 new_geometries.append(c['entity'])
                 appended_handles.add(c['handle'])
@@ -2024,7 +2070,9 @@ class StructuralProcessor:
         # Fallback for unassigned cadenetas
         for c in unassigned_cadenetas:
             if c['handle'] not in appended_handles:
-                c['entity'].layer = "CADENETA (No Pasante)"
+                c_pid = c.get('panel_id', '')
+                pid_suf = f"_{c_pid}" if c_pid else ""
+                c['entity'].layer = f"CADENETA{pid_suf} (No Pasante)"
                 c['entity'].segments = [(c['start'][0], c['start'][1], c['start'][2], c['end'][0], c['end'][1], c['end'][2])]
                 new_geometries.append(c['entity'])
                 appended_handles.add(c['handle'])
@@ -2032,7 +2080,11 @@ class StructuralProcessor:
         # Fallback for unmatched plates (prevent plate loss)
         for p in plates:
             if p['handle'] not in appended_handles:
-                p['entity'].layer = f"{p['orig_layer']} (No Pasante)"
+                p_pid = p.get('panel_id', '')
+                pid_suf = f"_{p_pid}" if p_pid else ""
+                is_testero = "TESTERO" in p['orig_layer'].upper()
+                base_plate = "TESTERO" if is_testero else "DURMIENTE"
+                p['entity'].layer = f"{base_plate}{pid_suf} (No Pasante)"
                 p['entity'].segments = [(p['start'][0], p['start'][1], p['start'][2], p['end'][0], p['end'][1], p['end'][2])]
                 new_geometries.append(p['entity'])
                 appended_handles.add(p['handle'])
@@ -2062,8 +2114,8 @@ class StructuralProcessor:
         report_lines = [
             f"Preprocesamiento Cadwork finalizado:",
             f"  - Paneles formados: {len(panels)}",
-            f"  - Capas de placas emparejadas: {len(plates)}",
-            f"  - Montantes procesados: {len(montantes)}",
+            f"  - Placas emparejadas: {len(used_plates)} de {len(plates)}",
+            f"  - Montantes procesados: {len(montantes)} (no asignados: {len(unassigned_montantes)})",
             f"  - Dinteles procesados: {len(dinteles)}",
             f"  - Alfeizares procesados: {len(alfeizares)}",
             f"  - Capialzados procesados: {len(capialzados)}",
@@ -2071,5 +2123,64 @@ class StructuralProcessor:
             f"  - Montantes desclasificados por extremo libre (aislamiento): {demoted_count}",
             f"  - Montantes promovidos a esquina: {corner_count}",
         ]
-        
+
+        # Collect unmatched plates and identify nomenclature causes
+        unmatched_plates = [p for p in plates if p['handle'] not in used_plates]
+        plate_warnings = []
+        if unmatched_plates:
+            plates_by_pid = defaultdict(lambda: {'TESTERO': [], 'DURMIENTE': []})
+            for p in plates:
+                pid = p.get('panel_id') or 'SIN_ID'
+                cat = 'TESTERO' if "TESTERO" in p['orig_layer'].upper() else 'DURMIENTE'
+                plates_by_pid[pid][cat].append(p)
+                
+            unmatched_by_pid = defaultdict(list)
+            for p in unmatched_plates:
+                pid = p.get('panel_id') or 'SIN_ID'
+                unmatched_by_pid[pid].append(p)
+                
+            for pid, un_list in sorted(unmatched_by_pid.items()):
+                total_t = len(plates_by_pid[pid]['TESTERO'])
+                total_d = len(plates_by_pid[pid]['DURMIENTE'])
+                if total_t > 0 and total_d == 0:
+                    plate_warnings.append(
+                        f"  * Panel '{pid}': tiene {total_t} placa(s) en capa TESTERO pero NINGUNA en capa DURMIENTE.\n"
+                        f"    -> Falta la capa DURMIENTE_{pid}. En Cadwork la solera/durmiente inferior debe nombrarse como 'Durmiente'."
+                    )
+                elif total_d > 0 and total_t == 0:
+                    plate_warnings.append(
+                        f"  * Panel '{pid}': tiene {total_d} placa(s) en capa DURMIENTE pero NINGUNA en capa TESTERO.\n"
+                        f"    -> Falta la capa TESTERO_{pid}. En Cadwork la pieza superior debe nombrarse como 'Testero'."
+                    )
+                else:
+                    plate_warnings.append(
+                        f"  * Panel '{pid}': tiene {total_t} testero(s) y {total_d} durmiente(s), pero {len(un_list)} no pudieron emparejarse.\n"
+                        f"    -> Comprobar tolerancia de altura Z (entre 1000 y {max_panel_height:.0f} mm) o proximidad XY."
+                    )
+
+        montante_warnings = []
+        if unassigned_montantes:
+            unassigned_by_pid = defaultdict(int)
+            for m in unassigned_montantes:
+                pid = m.get('panel_id') or 'SIN_ID'
+                unassigned_by_pid[pid] += 1
+            pid_details = ", ".join(f"{pid} ({cnt})" for pid, cnt in sorted(unassigned_by_pid.items()))
+            montante_warnings.append(
+                f"  * {len(unassigned_montantes)} montante(s) no fueron asignados a ningún panel formado (se guardaron como MONTANTES CORTOS residuales).\n"
+                f"    Paneles afectados: {pid_details}"
+            )
+
+        if plate_warnings or montante_warnings:
+            report_lines.append("")
+            report_lines.append("=" * 70)
+            report_lines.append("ADVERTENCIA: PLACAS SIN EMPAREJAR / NOMENCLATURA EN CADWORK")
+            report_lines.append("El archivo original debe venir correctamente nombrado desde Cadwork.")
+            report_lines.append("=" * 70)
+            if plate_warnings:
+                report_lines.append("\n[PANELES CON PLACAS SIN EMPAREJAR]:")
+                report_lines.extend(plate_warnings)
+            if montante_warnings:
+                report_lines.append("\n[MONTANTES HUÉRFANOS POR FALTA DE PANEL]:")
+                report_lines.extend(montante_warnings)
+
         return True, "\n".join(report_lines)

@@ -1,4 +1,5 @@
 import os
+import re
 from collections import defaultdict
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction, QColor
@@ -264,12 +265,31 @@ class MainWindow(QMainWindow):
 
 
 
+    def _normalize_layer_for_predefined(self, layer_name: str) -> str:
+        upper = layer_name.upper().strip()
+        if upper in PREDEFINED_LAYER_MAP:
+            return upper
+        # Try stripping panel id: "TIPO_PANEL (SUFFIX)" -> "TIPO (SUFFIX)"
+        m = re.match(r"^(.*?)(?:_[^\s(]+)?(\s*\([^)]+\))?$", upper)
+        if m:
+            base = m.group(1).strip()
+            suffix = m.group(2) if m.group(2) else ""
+            candidate = (base + suffix).strip()
+            if candidate in PREDEFINED_LAYER_MAP:
+                return candidate
+            if not suffix:
+                if f"{base} (PASANTE)" in PREDEFINED_LAYER_MAP:
+                    return f"{base} (PASANTE)"
+                if base == "MONTANTE" and "MONTANTES SIMPLES (PASANTE)" in PREDEFINED_LAYER_MAP:
+                    return "MONTANTES SIMPLES (PASANTE)"
+        return upper
+
     def _build_layer_colors(self, layers: list[str]) -> dict[str, QColor]:
         colors: dict[str, QColor] = {}
         for i, layer in enumerate(sorted(layers)):
-            upper = layer.upper()
-            if upper in PREDEFINED_LAYER_MAP:
-                _, qcolor = PREDEFINED_LAYER_MAP[upper]
+            norm = self._normalize_layer_for_predefined(layer)
+            if norm in PREDEFINED_LAYER_MAP:
+                _, qcolor = PREDEFINED_LAYER_MAP[norm]
                 colors[layer] = qcolor
             else:
                 _, qcolor = PREDEFINED_LAYERS_PALETTE[i % len(PREDEFINED_LAYERS_PALETTE)]
@@ -277,9 +297,9 @@ class MainWindow(QMainWindow):
         return colors
 
     def _get_layer_aci(self, layer_name: str, layers: list[str]) -> int:
-        upper = layer_name.upper()
-        if upper in PREDEFINED_LAYER_MAP:
-            aci, _ = PREDEFINED_LAYER_MAP[upper]
+        norm = self._normalize_layer_for_predefined(layer_name)
+        if norm in PREDEFINED_LAYER_MAP:
+            aci, _ = PREDEFINED_LAYER_MAP[norm]
             return aci
         
         sorted_layers = sorted(layers)
@@ -684,6 +704,14 @@ class MainWindow(QMainWindow):
 
         self.entity_geometries = processor.get_geometries()
         self._refresh_from_entity_geometries()
+
+        if "ADVERTENCIA: PLACAS SIN EMPAREJAR" in report:
+            QMessageBox.warning(
+                self,
+                "Advertencia de nomenclatura en paneles",
+                "Se han detectado placas sin emparejar debido a problemas de nomenclatura en el archivo original.\n\n"
+                "El archivo debe venir correctamente nombrado desde Cadwork (revisa la ventana de informe a continuación para ver los paneles afectados).",
+            )
 
         ResultTextDialog(
             title="Preprocesamiento Cadwork finalizado",
